@@ -39,6 +39,17 @@ cli = [
     "typer>=0.12.0",
     "rich>=13.0",
 ]
+web = [
+    "streamlit>=1.30.0",
+    "pandas>=2.0",
+    "altair>=5.0",
+]
+wandb = [
+    "wandb>=0.16.0",
+]
+all = [
+    "ftune[cli,web,wandb]",
+]
 
 [project.urls]
 Homepage = "https://github.com/yourusername/ftune"

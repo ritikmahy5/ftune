@@ -95,11 +95,23 @@ def get_model(name: str) -> ModelSpec:
         if key.lower().endswith(name_lower) or name_lower in key.lower():
             return spec
 
-    # No match — build a helpful error message
+    # No match in local DB — try HuggingFace Hub
+    try:
+        from ftune.hub import resolve_model_from_hub
+        spec = resolve_model_from_hub(name)
+        # Cache it for subsequent calls
+        models[name] = spec
+        return spec
+    except (ValueError, ConnectionError, Exception):
+        pass
+
+    # Nothing worked
     available = ", ".join(sorted(models.keys()))
     raise KeyError(
-        f"Model '{name}' not found in database. "
-        f"Available models: {available}"
+        f"Model '{name}' not found in local database or HuggingFace Hub. "
+        f"Available local models: {available}. "
+        f"For HuggingFace models, use the full model ID (e.g. 'org/model-name') "
+        f"and ensure you have internet access."
     )
 
 

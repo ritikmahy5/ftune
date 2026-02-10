@@ -22,7 +22,9 @@ from ftune.core.models import (
     TrainingConfig,
 )
 from ftune.estimator import Estimator
+from ftune.hub import resolve_model_from_hub
 from ftune.loader import get_gpu, get_model, list_gpu_names, list_model_names
+from ftune.validation import ActualMetrics, ValidationResult, Validator
 
 __version__ = "0.1.0"
 
@@ -48,4 +50,10 @@ __all__ = [
     "get_gpu",
     "list_model_names",
     "list_gpu_names",
+    # HuggingFace Hub
+    "resolve_model_from_hub",
+    # Validation
+    "Validator",
+    "ActualMetrics",
+    "ValidationResult",
 ]
