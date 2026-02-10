@@ -1,0 +1,103 @@
+# ftune GPU Database
+# Specs sourced from official NVIDIA datasheets.
+# Last updated: 2025-02-10
+
+gpus:
+  H100-80GB:
+    vram_gb: 80
+    fp16_tflops: 989.5
+    bf16_tflops: 989.5
+    fp32_tflops: 494.7
+    memory_bandwidth_gbps: 3350
+    architecture: Hopper
+    tdp_watts: 700
+
+  A100-80GB:
+    vram_gb: 80
+    fp16_tflops: 312
+    bf16_tflops: 312
+    fp32_tflops: 156
+    memory_bandwidth_gbps: 2039
+    architecture: Ampere
+    tdp_watts: 300
+
+  A100-40GB:
+    vram_gb: 40
+    fp16_tflops: 312
+    bf16_tflops: 312
+    fp32_tflops: 156
+    memory_bandwidth_gbps: 1555
+    architecture: Ampere
+    tdp_watts: 250
+
+  L4-24GB:
+    vram_gb: 24
+    fp16_tflops: 121
+    bf16_tflops: 121
+    fp32_tflops: 30.3
+    memory_bandwidth_gbps: 300
+    architecture: Ada Lovelace
+    tdp_watts: 72
+
+  RTX-4090-24GB:
+    vram_gb: 24
+    fp16_tflops: 165.2
+    bf16_tflops: 165.2
+    fp32_tflops: 82.6
+    memory_bandwidth_gbps: 1008
+    architecture: Ada Lovelace
+    tdp_watts: 450
+
+  RTX-3090-24GB:
+    vram_gb: 24
+    fp16_tflops: 71
+    bf16_tflops: 71
+    fp32_tflops: 35.6
+    memory_bandwidth_gbps: 936
+    architecture: Ampere
+    tdp_watts: 350
+
+  RTX-4080-16GB:
+    vram_gb: 16
+    fp16_tflops: 97.5
+    bf16_tflops: 97.5
+    fp32_tflops: 48.7
+    memory_bandwidth_gbps: 717
+    architecture: Ada Lovelace
+    tdp_watts: 320
+
+  T4-16GB:
+    vram_gb: 16
+    fp16_tflops: 65
+    bf16_tflops: 65
+    fp32_tflops: 8.1
+    memory_bandwidth_gbps: 300
+    architecture: Turing
+    tdp_watts: 70
+
+  V100-16GB:
+    vram_gb: 16
+    fp16_tflops: 125
+    bf16_tflops: 125
+    fp32_tflops: 15.7
+    memory_bandwidth_gbps: 900
+    architecture: Volta
+    tdp_watts: 300
+
+  V100-32GB:
+    vram_gb: 32
+    fp16_tflops: 125
+    bf16_tflops: 125
+    fp32_tflops: 15.7
+    memory_bandwidth_gbps: 900
+    architecture: Volta
+    tdp_watts: 300
+
+  A10G-24GB:
+    vram_gb: 24
+    fp16_tflops: 125
+    bf16_tflops: 125
+    fp32_tflops: 31.2
+    memory_bandwidth_gbps: 600
+    architecture: Ampere
+    tdp_watts: 150

@@ -1,0 +1,173 @@
+# ftune Model Database
+# Each model contains architecture specs needed for memory estimation.
+# Sources: HuggingFace model configs (config.json)
+# Last updated: 2025-02-10
+
+models:
+  meta-llama/Llama-3.1-8B:
+    parameters: 8_030_000_000
+    hidden_size: 4096
+    num_layers: 32
+    num_attention_heads: 32
+    num_kv_heads: 8
+    intermediate_size: 14336
+    vocab_size: 128256
+    max_seq_length: 131072
+    default_dtype: bfloat16
+
+  meta-llama/Llama-3.1-70B:
+    parameters: 70_554_000_000
+    hidden_size: 8192
+    num_layers: 80
+    num_attention_heads: 64
+    num_kv_heads: 8
+    intermediate_size: 28672
+    vocab_size: 128256
+    max_seq_length: 131072
+    default_dtype: bfloat16
+
+  meta-llama/Llama-3.1-405B:
+    parameters: 405_000_000_000
+    hidden_size: 16384
+    num_layers: 126
+    num_attention_heads: 128
+    num_kv_heads: 16
+    intermediate_size: 53248
+    vocab_size: 128256
+    max_seq_length: 131072
+    default_dtype: bfloat16
+
+  mistralai/Mistral-7B-v0.3:
+    parameters: 7_248_000_000
+    hidden_size: 4096
+    num_layers: 32
+    num_attention_heads: 32
+    num_kv_heads: 8
+    intermediate_size: 14336
+    vocab_size: 32768
+    max_seq_length: 32768
+    default_dtype: bfloat16
+
+  mistralai/Mixtral-8x7B-v0.1:
+    parameters: 46_700_000_000
+    hidden_size: 4096
+    num_layers: 32
+    num_attention_heads: 32
+    num_kv_heads: 8
+    intermediate_size: 14336
+    vocab_size: 32000
+    max_seq_length: 32768
+    default_dtype: bfloat16
+    is_moe: true
+    num_experts: 8
+    num_active_experts: 2
+
+  google/gemma-2-9b:
+    parameters: 9_240_000_000
+    hidden_size: 3584
+    num_layers: 42
+    num_attention_heads: 16
+    num_kv_heads: 8
+    intermediate_size: 14336
+    vocab_size: 256000
+    max_seq_length: 8192
+    default_dtype: bfloat16
+
+  google/gemma-2-27b:
+    parameters: 27_227_000_000
+    hidden_size: 4608
+    num_layers: 46
+    num_attention_heads: 32
+    num_kv_heads: 16
+    intermediate_size: 36864
+    vocab_size: 256000
+    max_seq_length: 8192
+    default_dtype: bfloat16
+
+  Qwen/Qwen2.5-7B:
+    parameters: 7_615_000_000
+    hidden_size: 3584
+    num_layers: 28
+    num_attention_heads: 28
+    num_kv_heads: 4
+    intermediate_size: 18944
+    vocab_size: 152064
+    max_seq_length: 131072
+    default_dtype: bfloat16
+
+  Qwen/Qwen2.5-72B:
+    parameters: 72_710_000_000
+    hidden_size: 8192
+    num_layers: 80
+    num_attention_heads: 64
+    num_kv_heads: 8
+    intermediate_size: 29568
+    vocab_size: 152064
+    max_seq_length: 131072
+    default_dtype: bfloat16
+
+  microsoft/phi-3-mini-4k-instruct:
+    parameters: 3_821_000_000
+    hidden_size: 3072
+    num_layers: 32
+    num_attention_heads: 32
+    num_kv_heads: 32
+    intermediate_size: 8192
+    vocab_size: 32064
+    max_seq_length: 4096
+    default_dtype: bfloat16
+
+  microsoft/phi-3-medium-4k-instruct:
+    parameters: 13_960_000_000
+    hidden_size: 5120
+    num_layers: 40
+    num_attention_heads: 40
+    num_kv_heads: 10
+    intermediate_size: 17920
+    vocab_size: 32064
+    max_seq_length: 4096
+    default_dtype: bfloat16
+
+  deepseek-ai/DeepSeek-V2-Lite:
+    parameters: 15_700_000_000
+    hidden_size: 2048
+    num_layers: 27
+    num_attention_heads: 16
+    num_kv_heads: 16
+    intermediate_size: 10944
+    vocab_size: 102400
+    max_seq_length: 163840
+    default_dtype: bfloat16
+
+  01-ai/Yi-1.5-9B:
+    parameters: 8_830_000_000
+    hidden_size: 4096
+    num_layers: 48
+    num_attention_heads: 32
+    num_kv_heads: 4
+    intermediate_size: 11008
+    vocab_size: 64000
+    max_seq_length: 4096
+    default_dtype: bfloat16
+
+  tiiuae/falcon-7b:
+    parameters: 6_920_000_000
+    hidden_size: 4544
+    num_layers: 32
+    num_attention_heads: 71
+    num_kv_heads: 1
+    intermediate_size: 18176
+    vocab_size: 65024
+    max_seq_length: 2048
+    default_dtype: bfloat16
+
+  stabilityai/stablelm-2-1_6b:
+    parameters: 1_644_000_000
+    hidden_size: 2048
+    num_layers: 24
+    num_attention_heads: 32
+    num_kv_heads: 32
+    intermediate_size: 5632
+    vocab_size: 100352
+    max_seq_length: 4096
+    default_dtype: bfloat16
