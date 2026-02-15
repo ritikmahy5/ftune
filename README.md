@@ -109,7 +109,7 @@ streamlit run src/ftune/app.py
 
 Four tabs: **Memory** (VRAM breakdown + chart), **Training Time** (all GPUs), **Cost** (provider comparison + spot pricing), **GPU Compatibility** (utilization chart).
 
-> 🔗 **Try it live:** [ftune.streamlit.app](https://ctmzaj3ncfyzdofsbcmfez.streamlit.app)
+> 🔗 **Try it live:** [ftuneai.streamlit.app](https://ftuneai.streamlit.app)
 
 ---
 
