@@ -19,6 +19,7 @@ from ftune.core.models import (
     MemoryBreakdown,
     OptimizerType,
     Quantization,
+    ShardingStrategy,
     TimeEstimate,
     TrainingConfig,
 )
@@ -68,6 +69,9 @@ class Estimator:
         lora_rank: int = 16,
         lora_alpha: int = 32,
         lora_target: Union[str, LoRATarget] = "attention",
+        flash_attention: bool = False,
+        sharding: Union[str, ShardingStrategy] = "none",
+        num_gpus: int = 1,
     ) -> None:
         # Resolve model spec from database
         self.model_spec = get_model(model)
@@ -84,6 +88,9 @@ class Estimator:
             lora_rank=lora_rank,
             lora_alpha=lora_alpha,
             lora_target=LoRATarget(lora_target) if isinstance(lora_target, str) else lora_target,
+            flash_attention=flash_attention,
+            sharding=ShardingStrategy(sharding) if isinstance(sharding, str) else sharding,
+            num_gpus=num_gpus,
         )
 
         # Initialize core estimators

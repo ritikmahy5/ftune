@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 
 class FineTuneMethod(str, Enum):
@@ -35,6 +35,16 @@ class LoRATarget(str, Enum):
     ATTENTION = "attention"          # q_proj, v_proj only
     ATTENTION_ALL = "attention_all"  # q, k, v, o projections
     ALL_LINEAR = "all_linear"        # attention + MLP layers
+
+
+class ShardingStrategy(str, Enum):
+    """Multi-GPU sharding strategies."""
+    NONE = "none"              # Single GPU or naive data parallel
+    ZERO_1 = "zero_1"         # ZeRO Stage 1: shard optimizer states
+    ZERO_2 = "zero_2"         # ZeRO Stage 2: shard optimizer + gradients
+    ZERO_3 = "zero_3"         # ZeRO Stage 3: shard optimizer + gradients + parameters
+    FSDP = "fsdp"             # PyTorch FSDP (similar to ZeRO-3)
+    FSDP_SHARD_GRAD = "fsdp_shard_grad"  # FSDP shard grad+optimizer only (like ZeRO-2)
 
 
 @dataclass
@@ -81,6 +91,10 @@ class TrainingConfig:
     lora_rank: int = 16
     lora_alpha: int = 32
     lora_target: LoRATarget = LoRATarget.ATTENTION
+    # Advanced
+    flash_attention: bool = False
+    sharding: ShardingStrategy = ShardingStrategy.NONE
+    num_gpus: int = 1
 
 
 @dataclass
@@ -98,6 +112,7 @@ class MemoryBreakdown:
     trainable_percentage: float = 0.0
     method: str = ""
     quantization: str = ""
+    sharding: str = "none"
 
 
 @dataclass
@@ -147,5 +162,44 @@ class CostComparison:
     """Cost comparison across all providers."""
     estimates: list  # List[CostEstimate]
     training_hours: float
-    cheapest: Optional[str] = None  # provider name
-    best_value: Optional[str] = None  # provider name (cost/performance)
+    cheapest: Optional[str] = None
+    best_value: Optional[str] = None
+
+
+@dataclass
+class CalibrationResult:
+    """Result from a hardware calibration benchmark."""
+    measured_mfu: float
+    measured_memory_gb: float
+    measured_throughput_tokens_per_sec: float
+    hardware_multiplier: float  # actual_time / theoretical_time
+    memory_multiplier: float    # actual_memory / estimated_memory
+    gpu_name: str = ""
+    steps_benchmarked: int = 10
+    notes: List[str] = field(default_factory=list)
+
+
+@dataclass
+class BudgetRecommendation:
+    """Configuration recommended by the budget optimizer."""
+    method: str
+    quantization: str
+    lora_rank: int
+    lora_target: str
+    batch_size: int
+    gradient_accumulation: int
+    gradient_checkpointing: bool
+    optimizer: str
+    flash_attention: bool
+    sharding: str
+    # Results
+    estimated_memory_gb: float
+    estimated_hours: float
+    estimated_cost: float
+    gpu: str
+    provider: str
+    num_gpus: int
+    fits: bool
+    # Meta
+    priority: str = ""  # "cost", "speed", "quality"
+    notes: List[str] = field(default_factory=list)
