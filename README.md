@@ -19,10 +19,12 @@
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-web-ui">Web UI</a> •
   <a href="#-features">Features</a> •
-  <a href="#-usage">Usage</a> •
+  <a href="#-budget-optimizer">Budget Optimizer</a> •
+  <a href="#-multi-gpu--sharding">Multi-GPU</a> •
+  <a href="#-calibration">Calibration</a> •
   <a href="#-validation">Validation</a> •
-  <a href="#-supported-models--gpus">Models & GPUs</a> •
-  <a href="#-roadmap">Roadmap</a> •
+  <a href="#-cli">CLI</a> •
+  <a href="#-supported-models-gpus--providers">Models & GPUs</a> •
   <a href="#-contributing">Contributing</a>
 </p>
 
@@ -38,11 +40,16 @@ Or worse — you rent 8×H100s for $30/hr, only to realize you could've done it 
 
 ### What makes ftune different?
 
-- **Works with ANY model** — fetches specs from HuggingFace Hub automatically, not just a hardcoded list
-- **Full cost comparison** — compares 8 cloud providers including spot pricing in one command
-- **Validation mode** — compare estimates against your actual W&B/TensorBoard logs to see how accurate they are
-- **Interactive web UI** — no install needed, just point and click
-- **Zero ML dependencies** — pure Python calculator, no PyTorch/TensorFlow required
+| Feature | ftune | Manual math | HF `accelerate estimate` |
+|---|---|---|---|
+| Works with any HuggingFace model | ✅ auto-fetches from Hub | ❌ | ✅ |
+| Multi-GPU / ZeRO / FSDP sharding | ✅ ZeRO 1/2/3 + FSDP | ❌ | ❌ |
+| Cloud cost comparison (8 providers) | ✅ with spot pricing | ❌ | ❌ |
+| Budget optimizer ("I have $50") | ✅ | ❌ | ❌ |
+| Hardware calibration mode | ✅ | ❌ | ❌ |
+| FlashAttention-2 memory savings | ✅ | manual | ❌ |
+| Validation against real runs | ✅ W&B, JSON, CSV | ❌ | ❌ |
+| Zero ML dependencies | ✅ pure Python | ✅ | ❌ needs torch |
 
 ---
 
@@ -62,6 +69,7 @@ est = Estimator(
     lora_rank=16,
     batch_size=4,
     seq_length=2048,
+    flash_attention=True,
 )
 
 # Memory
@@ -78,25 +86,11 @@ for c in costs.estimates[:5]:
     print(f"{c.provider:15s} | {c.gpu:15s} | ${c.total_cost:.2f}")
 ```
 
-**Output:**
-
-```
-Total VRAM: 9.09 GB
-Training time: 32.9 hours
-
-Vast.ai         | RTX-4090-24GB   | $24.89
-Lambda Labs     | H100-80GB       | $25.87
-Together AI     | H100-80GB       | $25.98
-Vast.ai         | H100-80GB       | $29.61
-Vast.ai         | A100-40GB       | $29.65
-```
-
 ### Works with ANY HuggingFace model
 
-Don't see your model in the built-in database? ftune auto-fetches specs from HuggingFace Hub:
+ftune auto-fetches model architecture from HuggingFace Hub — no configuration needed:
 
 ```python
-# Any model on HuggingFace — no configuration needed
 est = Estimator(model="NousResearch/Llama-2-7b-hf", method="qlora", quantization="4bit")
 est = Estimator(model="tiiuae/falcon-40b", method="lora", lora_rank=32)
 est = Estimator(model="bigscience/bloom-7b1", method="qlora", quantization="4bit")
@@ -106,21 +100,16 @@ est = Estimator(model="bigscience/bloom-7b1", method="qlora", quantization="4bit
 
 ## 🌐 Web UI
 
-ftune includes a full interactive web calculator built with Streamlit. No Python knowledge needed.
+ftune includes a full interactive web calculator built with Streamlit.
 
 ```bash
 pip install ftune[web]
 streamlit run src/ftune/app.py
 ```
 
-**Features:**
-- Sidebar with all configuration options (model, method, LoRA rank, batch size, etc.)
-- 📊 **Memory tab** — VRAM breakdown with bar chart
-- ⏱️ **Training Time tab** — time estimates across all compatible GPUs
-- 💰 **Cost tab** — full provider comparison with spot pricing
-- 🖥️ **GPU Compatibility tab** — utilization chart showing which GPUs fit
+Four tabs: **Memory** (VRAM breakdown + chart), **Training Time** (all GPUs), **Cost** (provider comparison + spot pricing), **GPU Compatibility** (utilization chart).
 
-<!-- > 🔗 **Try it live:** [ftune.streamlit.app](https://ftune.streamlit.app) *(coming soon)* -->
+<!-- > 🔗 **Try it live:** [ftune.streamlit.app](https://ftune.streamlit.app) -->
 
 ---
 
@@ -128,17 +117,19 @@ streamlit run src/ftune/app.py
 
 ### 📊 Memory Estimation
 
-Accurate VRAM calculation with component-level breakdown — model weights, gradients, optimizer states, activations, and CUDA overhead.
-
-| Method | What it does |
-|---|---|
-| **Full Fine-Tuning** | All parameters trainable, highest memory |
-| **LoRA** | Low-rank adapters, base model in fp16/bf16 |
-| **QLoRA** | 4-bit/8-bit quantized base + LoRA adapters |
+Component-level VRAM breakdown with support for FlashAttention-2, gradient checkpointing, and 5 optimizer types:
 
 ```python
-mem = est.estimate_memory()
+est = Estimator(
+    model="meta-llama/Llama-3.1-8B",
+    method="qlora",
+    quantization="4bit",
+    flash_attention=True,        # 25-50% activation memory reduction
+    gradient_checkpointing=True, # 5x activation reduction
+    optimizer="adam_8bit",       # 75% less optimizer memory vs AdamW
+)
 
+mem = est.estimate_memory()
 print(f"Model weights:    {mem.model_weights_gb:.2f} GB")
 print(f"LoRA adapters:    {mem.trainable_params_gb:.2f} GB")
 print(f"Gradients:        {mem.gradients_gb:.2f} GB")
@@ -148,75 +139,179 @@ print(f"CUDA overhead:    {mem.overhead_gb:.2f} GB")
 print(f"TOTAL:            {mem.total_gb:.2f} GB")
 ```
 
+**FlashAttention-2** avoids materializing the full N×N attention matrix, cutting activation memory by ~50%:
+
+```
+Without FlashAttention: 9.09 GB
+With FlashAttention:    6.79 GB  ← saved 2.30 GB (25%)
+```
+
+**Supported methods:** Full Fine-Tuning, LoRA, QLoRA (4-bit / 8-bit)
+**Supported optimizers:** AdamW, Adam, SGD, 8-bit Adam (bitsandbytes), Adafactor
+
 ### ⏱️ Training Time Estimation
 
-Wall-clock time estimates based on FLOPs calculation, GPU compute capacity, and Model FLOPs Utilization (MFU).
+FLOPs-based wall-clock time estimates with multi-GPU scaling:
 
 ```python
 # Single GPU
 time = est.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3)
-print(f"{time.total_hours:.1f} hours, {time.total_steps:,} steps")
 
-# Compare across all compatible GPUs
+# Compare all compatible GPUs
 for t in est.estimate_time_all_gpus(dataset_size=50000, epochs=3):
     print(f"{t.gpu_name:<18} {t.total_hours:>6.1f}h")
 ```
 
-Supports multi-GPU estimation with realistic scaling efficiency (accounts for communication overhead).
-
 ### 💰 Cloud Cost Comparison
 
-Compare costs across **8 cloud providers** with a single call:
+Compare across **8 cloud providers** including spot pricing:
 
 ```python
 costs = est.full_comparison(dataset_size=50000, epochs=3)
-
-for c in costs.estimates[:10]:
-    spot = f"${c.spot_total_cost:.2f}" if c.spot_total_cost else "—"
-    print(f"{c.provider:<18} {c.gpu:<16} ${c.total_cost:>8.2f}  spot: {spot}")
-
-print(f"\n🏆 Cheapest: {costs.cheapest}")
+print(f"🏆 Cheapest: {costs.cheapest}")
 print(f"💡 Best value: {costs.best_value}")
 ```
 
-**Supported providers:** AWS, Google Cloud, Microsoft Azure, Lambda Labs, RunPod, Vast.ai, Together AI, Modal — with on-demand and spot pricing.
+**Providers:** AWS, Google Cloud, Microsoft Azure, Lambda Labs, RunPod, Vast.ai, Together AI, Modal
 
-### 🖥️ GPU Compatibility Check
+---
 
-Instantly see which GPUs can handle your training run:
+## 🎯 Budget Optimizer
 
-```python
-for gpu in est.check_gpu_fit():
-    icon = "✅" if gpu.fits else "❌"
-    print(f"{icon} {gpu.gpu_name:<18} {gpu.vram_gb:>4.0f}GB  {gpu.utilization_percent:>5.1f}% used")
-```
-
-```
-✅ H100-80GB          80GB   11.4% used
-✅ A100-80GB          80GB   11.4% used
-✅ A100-40GB          40GB   22.7% used
-✅ RTX-4090-24GB      24GB   37.9% used
-✅ T4-16GB            16GB   56.8% used
-❌ — (none too small for QLoRA 8B!)
-```
-
-### 🔬 HuggingFace Hub Auto-Detect
-
-ftune works with **any model on HuggingFace Hub** — not just a hardcoded list. When a model isn't in the local database, ftune automatically fetches `config.json` from HuggingFace and extracts architecture specs:
+Reverse the logic — tell ftune your constraints and it finds the optimal configuration:
 
 ```python
-from ftune import resolve_model_from_hub
+from ftune import BudgetOptimizer
 
-# Fetch specs for any model
-spec = resolve_model_from_hub("NousResearch/Llama-2-7b-hf")
-print(f"{spec.name}: {spec.parameters:,} params, hidden={spec.hidden_size}")
+recs = BudgetOptimizer.optimize(
+    model="meta-llama/Llama-3.1-8B",
+    budget=50.0,              # max $50
+    gpu="RTX-3090-24GB",      # hardware constraint
+    dataset_size=10000,
+    epochs=1,
+    priority="cost",          # "cost", "speed", or "quality"
+)
+
+print(BudgetOptimizer.format_recommendations(recs))
 ```
 
-This happens automatically when you use `Estimator` with an unknown model name — no extra code needed.
+```
+╭────────────────────────────────────────────────╮
+│    🎯 ftune Budget Optimizer — Recommendations  │
+╰────────────────────────────────────────────────╯
 
-### 📊 Validation Mode
+  #1: LORA none, rank=8
+      GPU: RTX-3090-24GB (Vast.ai) | 1 GPU(s)
+      Batch: 1 × 1 accum | Optimizer: adamw
+      Memory: 17.8 GB | Time: 8.3h | Cost: $2.07
+      💡 FlashAttention-2 enabled, Gradient checkpointing ON
 
-Compare ftune estimates against your **actual training runs** to see how accurate the estimates are:
+  #2: LORA none, rank=16
+      GPU: RTX-3090-24GB (Vast.ai) | 1 GPU(s)
+      Batch: 1 × 1 accum | Optimizer: adamw
+      Memory: 17.9 GB | Time: 8.3h | Cost: $2.07
+      💡 FlashAttention-2 enabled, Gradient checkpointing ON
+```
+
+The optimizer searches across methods, LoRA ranks, batch sizes, optimizers, and FlashAttention to find configurations that fit your budget and hardware.
+
+---
+
+## 🔀 Multi-GPU & Sharding
+
+ftune supports DeepSpeed ZeRO Stages 1/2/3 and PyTorch FSDP for multi-GPU memory estimation:
+
+```python
+# Single GPU — doesn't fit
+est = Estimator(model="meta-llama/Llama-3.1-8B", method="full", batch_size=1)
+print(est.estimate_memory().total_gb)  # 104.4 GB ❌
+
+# ZeRO-3 on 4 GPUs — fits!
+est = Estimator(
+    model="meta-llama/Llama-3.1-8B",
+    method="full",
+    batch_size=1,
+    sharding="zero_3",
+    num_gpus=4,
+)
+print(est.estimate_memory().total_gb)  # 27.8 GB per GPU ✅
+```
+
+**How sharding reduces per-GPU memory:**
+
+| Strategy | What's sharded | 8B Full FT (per GPU) |
+|---|---|---|
+| None (single GPU) | Nothing | 104.4 GB |
+| ZeRO Stage 1 | Optimizer states | 52.8 GB |
+| ZeRO Stage 2 | + Gradients | 39.9 GB |
+| ZeRO Stage 3 / FSDP | + Model weights | 27.8 GB |
+
+This means ftune can now tell you: *"This 70B model won't fit on one A100, but it will fit on 4×A100s using ZeRO-3 with 17.4 GB per GPU utilization."*
+
+```python
+est = Estimator(
+    model="meta-llama/Llama-3.1-70B",
+    method="qlora",
+    quantization="4bit",
+    sharding="zero_3",
+    num_gpus=4,
+)
+mem = est.estimate_memory()
+print(f"70B QLoRA ZeRO-3: {mem.total_gb:.1f} GB per GPU")  # 17.4 GB ✅
+```
+
+**Supported strategies:** `none`, `zero_1`, `zero_2`, `zero_3`, `fsdp`, `fsdp_shard_grad`
+
+---
+
+## 🔧 Calibration
+
+Generic MFU constants can be off by 2-10x depending on your hardware, drivers, and framework. Calibration fixes this.
+
+**Run a quick 10-step benchmark on your GPU, then feed the results to ftune:**
+
+```python
+from ftune import Estimator, Calibrator
+
+est = Estimator(model="meta-llama/Llama-3.1-8B", method="qlora", quantization="4bit")
+mem = est.estimate_memory()
+time = est.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3)
+
+# After running 10 real training steps, you measured:
+cal = Calibrator.from_benchmark(
+    estimated_memory_gb=mem.total_gb,     # ftune's estimate
+    actual_memory_gb=11.2,                 # nvidia-smi peak
+    estimated_time_hours=time.total_hours, # ftune's estimate
+    actual_time_hours=5.0,                 # extrapolated from benchmark
+    gpu_name="A100-80GB",
+)
+
+# Now all future estimates are hardware-calibrated
+adjusted_time = cal.adjust_time(time.total_hours)
+adjusted_memory = cal.adjust_memory(mem.total_gb)
+print(f"Calibrated time: {adjusted_time:.1f}h (was {time.total_hours:.1f}h)")
+print(f"Calibrated memory: {adjusted_memory:.1f} GB (was {mem.total_gb:.1f} GB)")
+
+# Save calibration for reuse
+Calibrator.save(cal.result, "~/.ftune/my_a100_calibration.json")
+
+# Load it later
+from ftune.core.models import CalibrationResult
+saved = Calibrator.load("~/.ftune/my_a100_calibration.json")
+```
+
+**You can also use the measured MFU directly:**
+
+```python
+# Calibration found your actual MFU is 0.52
+time = est.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, mfu_override=0.52)
+```
+
+---
+
+## 📊 Validation
+
+Compare ftune estimates against actual training metrics from real runs:
 
 ```python
 from ftune import Estimator
@@ -224,11 +319,10 @@ from ftune.validation import Validator, ActualMetrics
 
 est = Estimator(model="meta-llama/Llama-3.1-8B", method="qlora", quantization="4bit")
 
-# From your actual training run
 actual = ActualMetrics(
-    peak_memory_gb=11.2,          # nvidia-smi or torch.cuda.max_memory_allocated()
-    training_time_hours=4.5,       # wall-clock time
-    total_cost=8.50,               # cloud bill
+    peak_memory_gb=11.2,
+    training_time_hours=4.5,
+    total_cost=8.50,
     gpu_name="A100-80GB",
     dataset_size=50000,
     epochs=3,
@@ -238,42 +332,52 @@ result = Validator.compare(est, actual)
 print(Validator.format_report(result))
 ```
 
-```
-╭────────────────────────────────────────────────╮
-│        📊 ftune Validation Report               │
-╰────────────────────────────────────────────────╯
-
-Memory:
-  Estimated:  9.09 GB
-  Actual:     11.20 GB
-  ✅ Error:  -2.11 GB (-18.8%)
-
-Training Time:
-  Estimated:  32.94 hours
-  Actual:     4.50 hours
-  ⚠️ Error:  +28.44 hours (+632.0%)
-
-Overall Accuracy: Fair (20-35% avg error)
-```
-
 **Load metrics from multiple sources:**
 
 ```python
-# From a JSON file
 actual = Validator.from_json("training_metrics.json")
-
-# From Weights & Biases
 actual = Validator.from_wandb("username/project/run_id")  # pip install ftune[wandb]
+metrics_list = Validator.from_csv("all_runs.csv")          # batch validation
+```
 
-# From a CSV (batch validation)
-metrics_list = Validator.from_csv("all_runs.csv")
+---
+
+## ⌨️ CLI
+
+```bash
+pip install ftune[cli]
+```
+
+```bash
+# Full estimate
+ftune estimate --model meta-llama/Llama-3.1-8B --method qlora --quantization 4bit
+
+# With all options
+ftune estimate \
+  --model meta-llama/Llama-3.1-8B \
+  --method qlora \
+  --quantization 4bit \
+  --lora-rank 16 \
+  --batch-size 4 \
+  --seq-length 2048 \
+  --dataset-size 50000 \
+  --epochs 3 \
+  --output json
+
+# List models and GPUs
+ftune models
+ftune gpus
+
+# Check pricing
+ftune pricing --gpu A100-80GB --hours 10
+
+# Validate against actual metrics
+ftune validate --model meta-llama/Llama-3.1-8B --method qlora --metrics metrics.json
 ```
 
 ---
 
 ## 🧮 How It Works
-
-ftune uses well-established formulas for GPU memory estimation — no guesswork, no ML dependencies.
 
 ### Memory Formula
 
@@ -283,48 +387,42 @@ ftune uses well-established formulas for GPU memory estimation — no guesswork,
 | Trainable Params | (same as weights) | `modules × 2 × hidden × rank` | Same as LoRA |
 | Gradients | `params × 2B` | `lora_params × 2B` | `lora_params × 2B` |
 | Optimizer (AdamW) | `params × 8B` | `lora_params × 8B` | `lora_params × 8B` |
+| Optimizer (8-bit Adam) | `params × 2B` | `lora_params × 2B` | `lora_params × 2B` |
 | Activations | `batch × seq × hidden × layers × factor` | Same | Same |
+| FlashAttention-2 | Activations × 0.5 | Activations × 0.5 | Activations × 0.5 |
 | Overhead | ~15% buffer | ~15% buffer | ~15% buffer |
-
-> `factor` ≈ 2 with gradient checkpointing, ≈ 10 without
+| ZeRO-3 / FSDP | Weights, grads, optimizer ÷ N GPUs | Same | Same |
 
 ### Training Time Formula
 
 ```
 FLOPs per token ≈ 6 × num_parameters
 Total FLOPs = flops_per_token × dataset_tokens × epochs
-Time = Total FLOPs / (GPU TFLOPS × MFU × num_gpus)
+Time = Total FLOPs / (GPU TFLOPS × MFU × num_gpus × scaling_efficiency)
 ```
 
-MFU (Model FLOPs Utilization) defaults to 0.30-0.35, conservative estimates for fine-tuning workloads.
+MFU defaults to 0.30-0.35 (conservative). Use calibration mode for hardware-specific values.
 
 ---
 
-## 📋 Supported Models & GPUs
+## 📋 Supported Models, GPUs & Providers
 
-### Built-in Models (15)
+### Built-in Models (15+)
 
 | Model | Parameters | Default dtype |
 |---|---|---|
-| meta-llama/Llama-3.1-8B | 8B | bf16 |
-| meta-llama/Llama-3.1-70B | 70B | bf16 |
-| meta-llama/Llama-3.1-405B | 405B | bf16 |
+| meta-llama/Llama-3.1-8B / 70B / 405B | 8B / 70B / 405B | bf16 |
 | mistralai/Mistral-7B-v0.3 | 7B | bf16 |
 | mistralai/Mixtral-8x7B-v0.1 | 47B (MoE) | bf16 |
-| google/gemma-2-9b | 9B | bf16 |
-| google/gemma-2-27b | 27B | bf16 |
-| Qwen/Qwen2.5-7B | 7B | bf16 |
-| Qwen/Qwen2.5-72B | 72B | bf16 |
-| microsoft/phi-3-mini-4k-instruct | 3.8B | bf16 |
-| microsoft/phi-3-medium-4k-instruct | 14B | bf16 |
+| google/gemma-2-9b / 27b | 9B / 27B | bf16 |
+| Qwen/Qwen2.5-7B / 72B | 7B / 72B | bf16 |
+| microsoft/phi-3-mini / medium | 3.8B / 14B | bf16 |
 | deepseek-ai/DeepSeek-V2-Lite | 16B | bf16 |
-| 01-ai/Yi-1.5-9B | 8.8B | bf16 |
-| tiiuae/falcon-7b | 6.9B | bf16 |
-| stabilityai/stablelm-2-1_6b | 1.6B | bf16 |
+| + Yi, Falcon, StableLM | various | bf16 |
 
-> **Plus ANY model on HuggingFace Hub** — ftune auto-fetches specs when a model isn't in the local database.
+> **Plus ANY model on HuggingFace Hub** via auto-detect.
 
-### Supported GPUs (11)
+### GPUs (11)
 
 | GPU | VRAM | FP16 TFLOPS |
 |---|---|---|
@@ -332,11 +430,9 @@ MFU (Model FLOPs Utilization) defaults to 0.30-0.35, conservative estimates for 
 | NVIDIA A100 | 40 / 80 GB | 312 |
 | NVIDIA A10G | 24 GB | 125 |
 | NVIDIA L4 | 24 GB | 121 |
-| RTX 4090 | 24 GB | 165 |
-| RTX 4080 | 16 GB | 97 |
+| RTX 4090 / 4080 | 24 / 16 GB | 165 / 97 |
 | RTX 3090 | 24 GB | 71 |
-| Tesla T4 | 16 GB | 65 |
-| Tesla V100 | 16 / 32 GB | 125 |
+| Tesla T4 / V100 | 16 / 16-32 GB | 65 / 125 |
 
 ### Cloud Providers (8)
 
@@ -345,106 +441,88 @@ MFU (Model FLOPs Utilization) defaults to 0.30-0.35, conservative estimates for 
 | AWS | H100, A100, T4, L4 | ✅ |
 | Google Cloud | H100, A100, T4, L4, V100 | ✅ |
 | Microsoft Azure | H100, A100, T4, V100 | ✅ |
-| Lambda Labs | H100, A100, A100-40G, RTX 4090 | — |
-| RunPod | H100, A100, A100-40G, RTX 4090, RTX 3090, L4 | ✅ |
-| Vast.ai | H100, A100, A100-40G, RTX 4090, RTX 3090 | — |
+| Lambda Labs | H100, A100, RTX 4090 | — |
+| RunPod | H100, A100, RTX 4090/3090, L4 | ✅ |
+| Vast.ai | H100, A100, RTX 4090/3090 | — |
 | Together AI | H100, A100 | — |
-| Modal | H100, A100, A100-40G, L4, T4 | — |
+| Modal | H100, A100, L4, T4 | — |
 
 ---
 
-## 📦 Installation Options
+## 📦 Installation
 
 ```bash
-# Core library only (no extra dependencies)
-pip install ftune
-
-# With Streamlit web UI
-pip install ftune[web]
-
-# With W&B validation support
-pip install ftune[wandb]
-
-# Everything
-pip install ftune[all]
+pip install ftune            # Core library (zero ML dependencies)
+pip install ftune[cli]       # + CLI with Rich terminal output
+pip install ftune[web]       # + Streamlit web UI
+pip install ftune[wandb]     # + Weights & Biases validation
+pip install ftune[all]       # Everything
 ```
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Memory estimation engine (full, LoRA, QLoRA)
+- [x] Memory estimation (full, LoRA, QLoRA)
 - [x] Training time estimation (FLOPs-based, multi-GPU)
 - [x] Cloud cost comparison (8 providers, spot pricing)
-- [x] HuggingFace Hub auto-detect (any model)
+- [x] HuggingFace Hub auto-detect
+- [x] FlashAttention-2 memory optimization
+- [x] ZeRO Stages 1/2/3 + FSDP sharding
+- [x] Hardware calibration mode
+- [x] Budget optimizer ("I have $50, what's optimal?")
 - [x] Validation mode (manual, JSON, W&B, CSV)
 - [x] Streamlit web UI
-- [ ] CLI with Rich terminal output (`ftune estimate --model ...`)
-- [ ] Configuration optimizer ("I have $50 budget, what's optimal?")
-- [ ] Export reports (JSON, Markdown, PDF)
-- [ ] Community validation dataset (crowdsourced accuracy data)
+- [x] CLI with Rich output
+- [x] GitHub Actions CI/CD
 - [ ] Streamlit Cloud deployment (public hosted version)
+- [ ] PyPI publish
+- [ ] Community validation dataset (crowdsourced accuracy data)
+- [ ] Active pricing API (real-time provider rates)
+- [ ] Exportable PDF reports
 
 ---
 
 ## 🔑 Design Principles
 
 - **Zero ML dependencies** — Pure Python calculator. No PyTorch, no TensorFlow, no GPU required.
-- **Works with any model** — HuggingFace Hub integration means instant support for thousands of models.
-- **Offline-first** — 15 models and 11 GPUs bundled. Works without internet for common models.
-- **Validates itself** — Built-in validation mode so you can see how accurate estimates really are.
+- **Works with any model** — HuggingFace Hub integration for instant support of thousands of models.
+- **Hardware-aware** — Calibration mode closes the gap between theory and your specific setup.
+- **Enterprise-ready** — ZeRO/FSDP sharding makes ftune relevant for serious multi-GPU training.
+- **Validates itself** — Compare estimates against actual runs. No black box.
 - **Fast** — Every estimate returns in under 1 second.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+The most valuable contribution is **validation data**. Run ftune against your actual training runs and share the results:
 
-1. **Validate estimates** — Run ftune against your actual training runs and share the results. This is the highest-impact contribution.
-2. **Add models** — Submit a PR adding new model specs to `data/models.yaml`
-3. **Update pricing** — Cloud pricing changes frequently. Help keep `data/pricing.yaml` current.
-4. **Add GPU data** — Add specs for new GPUs to `data/gpus.yaml`
-5. **Bug fixes & features** — Check the [issues](https://github.com/ritikmahy5/ftune/issues) tab
+```python
+from ftune import Estimator, Calibrator
+
+est = Estimator(model="your-model", method="qlora", quantization="4bit", ...)
+cal = Calibrator.from_benchmark(
+    estimated_memory_gb=est.estimate_memory().total_gb,
+    actual_memory_gb=...,       # from nvidia-smi
+    estimated_time_hours=est.estimate_time(...).total_hours,
+    actual_time_hours=...,       # wall-clock
+    gpu_name="...",
+)
+print(cal.format_report())
+# Share this in an issue or PR!
+```
+
+Other ways to help: update pricing data, add models/GPUs, fix bugs, improve the web UI.
 
 ```bash
-# Development setup
 git clone https://github.com/ritikmahy5/ftune.git
 cd ftune
 pip install -e ".[dev]"
-
-# Run tests
-PYTHONPATH=src pytest tests/
-
-# Run the web UI locally
-pip install streamlit pandas altair
-PYTHONPATH=src streamlit run src/ftune/app.py
+PYTHONPATH=src pytest tests/ -v
 ```
 
-### Sharing Validation Results
-
-The most valuable contribution is comparing ftune estimates against real training runs:
-
-```python
-from ftune import Estimator
-from ftune.validation import Validator, ActualMetrics
-
-est = Estimator(model="your-model", method="qlora", quantization="4bit", ...)
-
-actual = ActualMetrics(
-    peak_memory_gb=...,       # from nvidia-smi
-    training_time_hours=...,   # wall-clock
-    gpu_name="...",
-    dataset_size=...,
-    epochs=...,
-)
-
-result = Validator.compare(est, actual)
-print(Validator.format_report(result))
-# Share this output in an issue or PR!
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 ---
 
