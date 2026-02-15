@@ -1,0 +1,1 @@
+"""ftune CLI package."""

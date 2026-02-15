@@ -51,11 +51,14 @@ all = [
     "ftune[cli,web,wandb]",
 ]
 
+[project.scripts]
+ftune = "ftune.cli.app:main"
+
 [project.urls]
-Homepage = "https://github.com/yourusername/ftune"
-Documentation = "https://github.com/yourusername/ftune#readme"
-Repository = "https://github.com/yourusername/ftune"
-Issues = "https://github.com/yourusername/ftune/issues"
+Homepage = "https://github.com/ritikmahy5/ftune"
+Documentation = "https://github.com/ritikmahy5/ftune#readme"
+Repository = "https://github.com/ritikmahy5/ftune"
+Issues = "https://github.com/ritikmahy5/ftune/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ftune"]
