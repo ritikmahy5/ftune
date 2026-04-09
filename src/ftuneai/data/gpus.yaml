@@ -69,7 +69,7 @@ gpus:
   T4-16GB:
     vram_gb: 16
     fp16_tflops: 65
-    bf16_tflops: 65
+    bf16_tflops: 8.1    # T4 (Turing) has no native bf16; falls back to fp32 speed
     fp32_tflops: 8.1
     memory_bandwidth_gbps: 300
     architecture: Turing
@@ -78,7 +78,7 @@ gpus:
   V100-16GB:
     vram_gb: 16
     fp16_tflops: 125
-    bf16_tflops: 125
+    bf16_tflops: 15.7   # V100 (Volta) has no native bf16; falls back to fp32 speed
     fp32_tflops: 15.7
     memory_bandwidth_gbps: 900
     architecture: Volta
@@ -87,7 +87,7 @@ gpus:
   V100-32GB:
     vram_gb: 32
     fp16_tflops: 125
-    bf16_tflops: 125
+    bf16_tflops: 15.7   # V100 (Volta) has no native bf16; falls back to fp32 speed
     fp32_tflops: 15.7
     memory_bandwidth_gbps: 900
     architecture: Volta

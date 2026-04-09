@@ -368,9 +368,9 @@ class TestGradientCheckpointing:
         mem_off = est_off.estimate_memory()
 
         assert mem_on.activations_gb < mem_off.activations_gb
-        # Should be roughly 5x reduction
+        # Should be roughly 2.5x reduction (factor 10 vs 4)
         ratio = mem_off.activations_gb / mem_on.activations_gb
-        assert ratio > 3, f"Expected >3x reduction, got {ratio:.1f}x"
+        assert ratio > 2, f"Expected >2x reduction, got {ratio:.1f}x"
 
     def test_checkpointing_reduces_total(self):
         """Total memory should be lower with checkpointing."""
