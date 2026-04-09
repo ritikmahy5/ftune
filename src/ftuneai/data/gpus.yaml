@@ -3,6 +3,15 @@
 # Last updated: 2025-02-10
 
 gpus:
+  H200-141GB:
+    vram_gb: 141
+    fp16_tflops: 989.5
+    bf16_tflops: 989.5
+    fp32_tflops: 494.7
+    memory_bandwidth_gbps: 4800
+    architecture: Hopper
+    tdp_watts: 700
+
   H100-80GB:
     vram_gb: 80
     fp16_tflops: 989.5

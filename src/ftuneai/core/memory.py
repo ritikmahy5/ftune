@@ -204,14 +204,20 @@ class MemoryEstimator:
         up_params = rank * (hidden + intermediate)     # hidden -> intermediate
         down_params = rank * (intermediate + hidden)   # intermediate -> hidden
 
+        # MoE: each expert has its own FFN layers
+        num_experts = 1
+        if self.model.is_moe and self.model.num_experts:
+            num_experts = self.model.num_experts
+
+        mlp_params = (gate_params + up_params + down_params) * num_experts
+
         target = self.config.lora_target
         if target == LoRATarget.ATTENTION:
             per_layer = q_params + v_params
         elif target == LoRATarget.ATTENTION_ALL:
             per_layer = q_params + k_params + v_params + o_params
         elif target == LoRATarget.ALL_LINEAR:
-            per_layer = (q_params + k_params + v_params + o_params
-                         + gate_params + up_params + down_params)
+            per_layer = (q_params + k_params + v_params + o_params + mlp_params)
         else:
             per_layer = q_params + v_params
 

@@ -718,3 +718,53 @@ class TestMoEMemory:
 
         # Model weights should be the same (all experts stored)
         assert mem.model_weights_gb == mem_non_moe.model_weights_gb
+
+    def test_moe_all_linear_more_params_than_non_moe(self):
+        """MoE ALL_LINEAR should have more LoRA params than non-MoE equivalent
+        because each expert has its own FFN layers."""
+        from ftuneai.core.memory import MemoryEstimator
+        from ftuneai.core.models import TrainingConfig, FineTuneMethod, LoRATarget, OptimizerType, ShardingStrategy
+        from ftuneai.loader import get_model
+        from dataclasses import replace
+
+        moe_spec = get_model("mistralai/Mixtral-8x7B-v0.1")
+        assert moe_spec.is_moe
+        assert moe_spec.num_experts == 8
+
+        config = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ALL_LINEAR,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        moe_params = MemoryEstimator(moe_spec, config)._compute_lora_params()
+        non_moe_spec = replace(moe_spec, is_moe=False, num_experts=None, num_active_experts=None)
+        non_moe_params = MemoryEstimator(non_moe_spec, config)._compute_lora_params()
+
+        # MoE should have ~8x more MLP LoRA params (8 experts)
+        assert moe_params > non_moe_params * 3, (
+            f"MoE ALL_LINEAR ({moe_params:,}) should be much larger than "
+            f"non-MoE ({non_moe_params:,}) due to per-expert FFN layers"
+        )
+
+    def test_moe_attention_only_same_as_non_moe(self):
+        """MoE ATTENTION target should have same LoRA params as non-MoE
+        because attention is shared (not per-expert)."""
+        from ftuneai.core.memory import MemoryEstimator
+        from ftuneai.core.models import TrainingConfig, FineTuneMethod, LoRATarget, OptimizerType, ShardingStrategy
+        from ftuneai.loader import get_model
+        from dataclasses import replace
+
+        moe_spec = get_model("mistralai/Mixtral-8x7B-v0.1")
+        config = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ATTENTION,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        moe_params = MemoryEstimator(moe_spec, config)._compute_lora_params()
+        non_moe_spec = replace(moe_spec, is_moe=False, num_experts=None, num_active_experts=None)
+        non_moe_params = MemoryEstimator(non_moe_spec, config)._compute_lora_params()
+
+        # Attention is shared — same params regardless of MoE
+        assert moe_params == non_moe_params
