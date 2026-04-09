@@ -104,7 +104,7 @@ ftune includes a full interactive web calculator built with Streamlit.
 
 ```bash
 pip install ftuneai[web]
-streamlit run src/ftune/app.py
+streamlit run src/ftuneai/app.py
 ```
 
 Four tabs: **Memory** (VRAM breakdown + chart), **Training Time** (all GPUs), **Cost** (provider comparison + spot pricing), **GPU Compatibility** (utilization chart).

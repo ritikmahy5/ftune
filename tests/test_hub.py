@@ -148,7 +148,7 @@ class TestDetectDtype:
 class TestMoEDetection:
     """Tests for Mixture of Experts model detection."""
 
-    @patch("ftune.hub.urlopen")
+    @patch("ftuneai.hub.urlopen")
     def test_moe_model_detected(self, mock_urlopen):
         mock_urlopen.return_value = _mock_urlopen(MIXTRAL_MOE_CONFIG)
         spec = resolve_model_from_hub("mistralai/Mixtral-8x7B-v0.1")
@@ -156,7 +156,7 @@ class TestMoEDetection:
         assert spec.num_experts == 8
         assert spec.num_active_experts == 2
 
-    @patch("ftune.hub.urlopen")
+    @patch("ftuneai.hub.urlopen")
     def test_non_moe_model(self, mock_urlopen):
         mock_urlopen.return_value = _mock_urlopen(LLAMA_CONFIG)
         spec = resolve_model_from_hub("meta-llama/Llama-3.1-8B")
@@ -172,7 +172,7 @@ class TestModelNameValidation:
     def test_valid_model_name(self):
         """Valid org/model format should not raise."""
         # Just test the validation, not the network call
-        with patch("ftune.hub.urlopen") as mock:
+        with patch("ftuneai.hub.urlopen") as mock:
             mock.return_value = _mock_urlopen(LLAMA_CONFIG)
             config = fetch_model_config("meta-llama/Llama-3.1-8B")
             assert isinstance(config, dict)
@@ -194,7 +194,7 @@ class TestModelNameValidation:
 
 
 class TestErrorHandling:
-    @patch("ftune.hub.urlopen")
+    @patch("ftuneai.hub.urlopen")
     def test_network_error_raises_value_error(self, mock_urlopen):
         """Network failure should raise ValueError with helpful message."""
         from urllib.error import URLError
@@ -202,7 +202,7 @@ class TestErrorHandling:
         with pytest.raises(ValueError, match="Could not fetch config"):
             fetch_model_config("org/nonexistent-model")
 
-    @patch("ftune.hub.urlopen")
+    @patch("ftuneai.hub.urlopen")
     def test_missing_architecture_fields(self, mock_urlopen):
         """Config without required fields should raise ValueError."""
         mock_urlopen.return_value = _mock_urlopen({"some_random_key": 42})
