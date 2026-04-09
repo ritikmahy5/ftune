@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/ftune/"><img src="https://img.shields.io/pypi/v/ftune?color=blue&label=PyPI" alt="PyPI" /></a>
-  <a href="https://pypi.org/project/ftune/"><img src="https://img.shields.io/pypi/pyversions/ftune" alt="Python" /></a>
+  <a href="https://pypi.org/project/ftuneai/"><img src="https://img.shields.io/pypi/v/ftuneai?color=blue&label=PyPI" alt="PyPI" /></a>
+  <a href="https://pypi.org/project/ftuneai/"><img src="https://img.shields.io/pypi/pyversions/ftuneai" alt="Python" /></a>
   <a href="https://github.com/ritikmahy5/ftune/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ritikmahy5/ftune" alt="License" /></a>
   <a href="https://github.com/ritikmahy5/ftune/actions"><img src="https://img.shields.io/github/actions/workflow/status/ritikmahy5/ftune/ci.yml?label=tests" alt="Tests" /></a>
 </p>
@@ -56,7 +56,7 @@ Or worse — you rent 8×H100s for $30/hr, only to realize you could've done it 
 ## 🚀 Quick Start
 
 ```bash
-pip install ftune
+pip install ftuneai
 ```
 
 ```python
@@ -103,7 +103,7 @@ est = Estimator(model="bigscience/bloom-7b1", method="qlora", quantization="4bit
 ftune includes a full interactive web calculator built with Streamlit.
 
 ```bash
-pip install ftune[web]
+pip install ftuneai[web]
 streamlit run src/ftune/app.py
 ```
 
@@ -336,7 +336,7 @@ print(Validator.format_report(result))
 
 ```python
 actual = Validator.from_json("training_metrics.json")
-actual = Validator.from_wandb("username/project/run_id")  # pip install ftune[wandb]
+actual = Validator.from_wandb("username/project/run_id")  # pip install ftuneai[wandb]
 metrics_list = Validator.from_csv("all_runs.csv")          # batch validation
 ```
 
@@ -345,7 +345,7 @@ metrics_list = Validator.from_csv("all_runs.csv")          # batch validation
 ## ⌨️ CLI
 
 ```bash
-pip install ftune[cli]
+pip install ftuneai[cli]
 ```
 
 ```bash
@@ -480,11 +480,11 @@ ftune provides **analytical estimates**, not profiling results. All numbers are 
 ## 📦 Installation
 
 ```bash
-pip install ftune            # Core library (zero ML dependencies)
-pip install ftune[cli]       # + CLI with Rich terminal output
-pip install ftune[web]       # + Streamlit web UI
-pip install ftune[wandb]     # + Weights & Biases validation
-pip install ftune[all]       # Everything
+pip install ftuneai            # Core library (zero ML dependencies)
+pip install ftuneai[cli]       # + CLI with Rich terminal output
+pip install ftuneai[web]       # + Streamlit web UI
+pip install ftuneai[wandb]     # + Weights & Biases validation
+pip install ftuneai[all]       # Everything
 ```
 
 ---

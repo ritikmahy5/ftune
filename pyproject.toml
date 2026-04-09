@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ftune"
+name = "ftuneai"
 version = "0.2.0"
 description = "Estimate GPU memory, training time, and costs for LLM fine-tuning"
 readme = "README.md"
