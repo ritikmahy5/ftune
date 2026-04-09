@@ -52,4 +52,4 @@ jobs:
 
       - name: Run mypy
         run: |
-          PYTHONPATH=src mypy src/ftune/ --ignore-missing-imports
+          PYTHONPATH=src mypy src/ftuneai/ --ignore-missing-imports

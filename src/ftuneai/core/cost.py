@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 
-from ftune.core.models import CostComparison, CostEstimate
+from ftuneai.core.models import CostComparison, CostEstimate
 
 _DATA_DIR = Path(__file__).parent.parent / "data"
 _PRICING_PATH = _DATA_DIR / "pricing.yaml"

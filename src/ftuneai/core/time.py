@@ -6,7 +6,7 @@ GPU compute capacity, and training configuration.
 
 from __future__ import annotations
 
-from ftune.core.models import (
+from ftuneai.core.models import (
     FineTuneMethod,
     GPUSpec,
     ModelSpec,

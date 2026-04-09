@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import List, Optional, Union
 
-from ftune.core.cost import CostEstimator
-from ftune.core.memory import MemoryEstimator
-from ftune.core.models import (
+from ftuneai.core.cost import CostEstimator
+from ftuneai.core.memory import MemoryEstimator
+from ftuneai.core.models import (
     CostComparison,
     FineTuneMethod,
     GPUFit,
@@ -22,8 +22,8 @@ from ftune.core.models import (
     TimeEstimate,
     TrainingConfig,
 )
-from ftune.core.time import TimeEstimator
-from ftune.loader import get_gpu, get_model, load_gpus
+from ftuneai.core.time import TimeEstimator
+from ftuneai.loader import get_gpu, get_model, load_gpus
 
 
 class Estimator:
@@ -118,7 +118,7 @@ class Estimator:
         all_gpus = load_gpus()
 
         if gpu_names:
-            from ftune.loader import get_gpu
+            from ftuneai.loader import get_gpu
             gpus = [get_gpu(name) for name in gpu_names]
         else:
             gpus = list(all_gpus.values())
@@ -259,7 +259,7 @@ class Estimator:
         Returns:
             Human-readable summary string.
         """
-        from ftune.utils.formatting import format_params, format_percentage
+        from ftuneai.utils.formatting import format_params, format_percentage
 
         mem = self.estimate_memory()
         fits = self.check_gpu_fit()

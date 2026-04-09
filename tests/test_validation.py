@@ -1,7 +1,7 @@
 """Tests for validation module."""
 
-from ftune import Estimator
-from ftune.validation import Validator, ActualMetrics, ValidationResult
+from ftuneai import Estimator
+from ftuneai.validation import Validator, ActualMetrics, ValidationResult
 
 
 class TestValidation:

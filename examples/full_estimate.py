@@ -3,7 +3,7 @@
 Run: python examples/full_estimate.py
 """
 
-from ftune import Estimator
+from ftuneai import Estimator
 
 
 def main():

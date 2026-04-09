@@ -9,9 +9,9 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from ftune.core.cost import CostEstimator
-from ftune.core.memory import MemoryEstimator
-from ftune.core.models import (
+from ftuneai.core.cost import CostEstimator
+from ftuneai.core.memory import MemoryEstimator
+from ftuneai.core.models import (
     BudgetRecommendation,
     FineTuneMethod,
     LoRATarget,
@@ -20,8 +20,8 @@ from ftune.core.models import (
     ShardingStrategy,
     TrainingConfig,
 )
-from ftune.core.time import TimeEstimator
-from ftune.loader import get_gpu, get_model, load_gpus
+from ftuneai.core.time import TimeEstimator
+from ftuneai.loader import get_gpu, get_model, load_gpus
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class BudgetOptimizer:
     """Find optimal fine-tuning configuration given budget/hardware constraints.
 
     Example:
-        >>> from ftune.optimizer import BudgetOptimizer
+        >>> from ftuneai.optimizer import BudgetOptimizer
         >>> recs = BudgetOptimizer.optimize(
         ...     model="meta-llama/Llama-3.1-8B",
         ...     budget=20.0,

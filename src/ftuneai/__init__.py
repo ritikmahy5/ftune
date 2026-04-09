@@ -1,14 +1,14 @@
 """ftune — Estimate GPU memory, training time, and costs for LLM fine-tuning.
 
 Quick start:
-    >>> from ftune import Estimator
+    >>> from ftuneai import Estimator
     >>> est = Estimator(model="meta-llama/Llama-3.1-8B", method="qlora", quantization="4bit")
     >>> mem = est.estimate_memory()
     >>> print(f"Total VRAM: {mem.total_gb:.2f} GB")
 """
 
-from ftune.calibration import Calibrator
-from ftune.core.models import (
+from ftuneai.calibration import Calibrator
+from ftuneai.core.models import (
     BudgetRecommendation,
     CalibrationResult,
     CostComparison,
@@ -25,11 +25,11 @@ from ftune.core.models import (
     TimeEstimate,
     TrainingConfig,
 )
-from ftune.estimator import Estimator
-from ftune.hub import resolve_model_from_hub
-from ftune.loader import get_gpu, get_model, list_gpu_names, list_model_names
-from ftune.optimizer import BudgetOptimizer
-from ftune.validation import ActualMetrics, ValidationResult, Validator
+from ftuneai.estimator import Estimator
+from ftuneai.hub import resolve_model_from_hub
+from ftuneai.loader import get_gpu, get_model, list_gpu_names, list_model_names
+from ftuneai.optimizer import BudgetOptimizer
+from ftuneai.validation import ActualMetrics, ValidationResult, Validator
 
 __version__ = "0.2.0"
 

@@ -3,7 +3,7 @@
 Run: python examples/basic_memory.py
 """
 
-from ftune import Estimator, list_model_names, list_gpu_names
+from ftuneai import Estimator, list_model_names, list_gpu_names
 
 
 def main():

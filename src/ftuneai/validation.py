@@ -94,8 +94,8 @@ class Validator:
     """Compare ftune estimates against actual training metrics.
 
     Example:
-        >>> from ftune import Estimator
-        >>> from ftune.validation import Validator, ActualMetrics
+        >>> from ftuneai import Estimator
+        >>> from ftuneai.validation import Validator, ActualMetrics
         >>>
         >>> est = Estimator(model="meta-llama/Llama-3.1-8B", method="qlora", quantization="4bit")
         >>> actual = ActualMetrics(peak_memory_gb=11.2, training_time_hours=4.5)

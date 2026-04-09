@@ -8,8 +8,8 @@ Thanks for your interest in contributing! Here's how you can help.
 Run ftune against your actual training runs and share the results. This helps everyone calibrate expectations.
 
 ```python
-from ftune import Estimator
-from ftune.validation import Validator, ActualMetrics
+from ftuneai import Estimator
+from ftuneai.validation import Validator, ActualMetrics
 
 est = Estimator(model="your-model", method="qlora", quantization="4bit", ...)
 actual = ActualMetrics(
@@ -26,13 +26,13 @@ print(Validator.format_report(result))
 Open an issue or PR with your validation report!
 
 ### 2. Update Pricing Data
-Cloud GPU pricing changes frequently. Help keep `src/ftune/data/pricing.yaml` current.
+Cloud GPU pricing changes frequently. Help keep `src/ftuneai/data/pricing.yaml` current.
 
 ### 3. Add Models
-Add new model specs to `src/ftune/data/models.yaml`. Include: parameters, hidden_size, num_layers, num_attention_heads, num_kv_heads, intermediate_size, vocab_size, max_seq_length.
+Add new model specs to `src/ftuneai/data/models.yaml`. Include: parameters, hidden_size, num_layers, num_attention_heads, num_kv_heads, intermediate_size, vocab_size, max_seq_length.
 
 ### 4. Add GPUs
-Add new GPU specs to `src/ftune/data/gpus.yaml`. Include: vram_gb, fp16_tflops, bf16_tflops, fp32_tflops, memory_bandwidth_gbps.
+Add new GPU specs to `src/ftuneai/data/gpus.yaml`. Include: vram_gb, fp16_tflops, bf16_tflops, fp32_tflops, memory_bandwidth_gbps.
 
 ## Development Setup
 
@@ -48,11 +48,11 @@ PYTHONPATH=src pytest tests/ -v
 
 # Run the CLI (needs extras)
 pip install typer rich
-PYTHONPATH=src python -m ftune estimate --model meta-llama/Llama-3.1-8B --method qlora
+PYTHONPATH=src python -m ftuneai estimate --model meta-llama/Llama-3.1-8B --method qlora
 
 # Run the web UI
 pip install streamlit pandas altair
-PYTHONPATH=src streamlit run src/ftune/app.py
+PYTHONPATH=src streamlit run src/ftuneai/app.py
 ```
 
 ## Code Style

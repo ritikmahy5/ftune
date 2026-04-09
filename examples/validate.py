@@ -3,8 +3,8 @@
 Run: python examples/validate.py
 """
 
-from ftune import Estimator
-from ftune.validation import Validator, ActualMetrics
+from ftuneai import Estimator
+from ftuneai.validation import Validator, ActualMetrics
 
 
 def main():

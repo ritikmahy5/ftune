@@ -1,6 +1,6 @@
 """Tests for training time estimation engine."""
 
-from ftune import Estimator
+from ftuneai import Estimator
 
 
 class TestTimeEstimation:

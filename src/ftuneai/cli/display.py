@@ -8,8 +8,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ftune.core.models import CostComparison, GPUFit, MemoryBreakdown, TimeEstimate
-from ftune.utils.formatting import format_params, format_percentage
+from ftuneai.core.models import CostComparison, GPUFit, MemoryBreakdown, TimeEstimate
+from ftuneai.utils.formatting import format_params, format_percentage
 
 console = Console()
 

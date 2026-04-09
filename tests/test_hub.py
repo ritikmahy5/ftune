@@ -8,7 +8,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from io import BytesIO
 
-from ftune.hub import (
+from ftuneai.hub import (
     _extract_field,
     _estimate_param_count,
     _detect_dtype,

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftuneai"
-version = "0.2.1"
+version = "0.3.0"
 description = "Estimate GPU memory, training time, and costs for LLM fine-tuning"
 readme = "README.md"
 license = "MIT"
@@ -58,7 +58,7 @@ all = [
 ]
 
 [project.scripts]
-ftune = "ftune.cli.app:main"
+ftune = "ftuneai.cli.app:main"
 
 [project.urls]
 Homepage = "https://github.com/ritikmahy5/ftune"
@@ -67,7 +67,7 @@ Repository = "https://github.com/ritikmahy5/ftune"
 Issues = "https://github.com/ritikmahy5/ftune/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ftune"]
+packages = ["src/ftuneai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

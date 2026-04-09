@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from ftune import Estimator
-from ftune.core.cost import (
+from ftuneai import Estimator
+from ftuneai.core.cost import (
     CostEstimator, list_providers, get_provider_display_name,
     update_price, get_staleness,
 )
@@ -152,7 +152,7 @@ class TestEstimatorCostIntegration:
 # Pricing update tests
 # ─────────────────────────────────────────────────────────
 
-_PRICING_SRC = Path(__file__).parent.parent / "src" / "ftune" / "data" / "pricing.yaml"
+_PRICING_SRC = Path(__file__).parent.parent / "src" / "ftuneai" / "data" / "pricing.yaml"
 
 
 @pytest.fixture

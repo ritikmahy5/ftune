@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 import yaml
 
-from ftune.core.models import GPUSpec, ModelSpec
+from ftuneai.core.models import GPUSpec, ModelSpec
 
 _DATA_DIR = Path(__file__).parent / "data"
 
@@ -97,7 +97,7 @@ def get_model(name: str) -> ModelSpec:
 
     # No match in local DB — try HuggingFace Hub
     try:
-        from ftune.hub import resolve_model_from_hub
+        from ftuneai.hub import resolve_model_from_hub
         spec = resolve_model_from_hub(name)
         # Cache it for subsequent calls
         models[name] = spec

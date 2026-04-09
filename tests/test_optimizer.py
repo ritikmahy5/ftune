@@ -1,7 +1,7 @@
 """Tests for the Budget Optimizer module."""
 
 import pytest
-from ftune.optimizer import BudgetOptimizer
+from ftuneai.optimizer import BudgetOptimizer
 
 
 class TestBudgetConstraints:

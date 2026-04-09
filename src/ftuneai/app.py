@@ -5,7 +5,7 @@ Run with:
     streamlit run app.py
 
 Or from the project root:
-    streamlit run src/ftune/app.py
+    streamlit run src/ftuneai/app.py
 """
 
 import sys
@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import streamlit as st
 
-from ftune import Estimator, list_model_names
+from ftuneai import Estimator, list_model_names
 
 
 # ─────────────────────────────────────────────
@@ -307,7 +307,7 @@ with tab1:
         st.altair_chart(chart, use_container_width=True)
 
     # Trainable params info
-    from ftune.utils.formatting import format_params
+    from ftuneai.utils.formatting import format_params
     st.info(
         f"📐 **Trainable Parameters:** {format_params(mem.trainable_params)} "
         f"({mem.trainable_percentage:.3f}% of {format_params(mem.total_params)} total)"

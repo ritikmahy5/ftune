@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import List
 
-from ftune.core.models import (
+from ftuneai.core.models import (
     FineTuneMethod,
     GPUFit,
     GPUSpec,

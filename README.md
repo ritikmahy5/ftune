@@ -60,7 +60,7 @@ pip install ftuneai
 ```
 
 ```python
-from ftune import Estimator
+from ftuneai import Estimator
 
 est = Estimator(
     model="meta-llama/Llama-3.1-8B",
@@ -181,7 +181,7 @@ print(f"💡 Best value: {costs.best_value}")
 Reverse the logic — tell ftune your constraints and it finds the optimal configuration:
 
 ```python
-from ftune import BudgetOptimizer
+from ftuneai import BudgetOptimizer
 
 recs = BudgetOptimizer.optimize(
     model="meta-llama/Llama-3.1-8B",
@@ -271,7 +271,7 @@ Generic MFU constants can be off by 2-10x depending on your hardware, drivers, a
 **Run a quick 10-step benchmark on your GPU, then feed the results to ftune:**
 
 ```python
-from ftune import Estimator, Calibrator
+from ftuneai import Estimator, Calibrator
 
 est = Estimator(model="meta-llama/Llama-3.1-8B", method="qlora", quantization="4bit")
 mem = est.estimate_memory()
@@ -296,7 +296,7 @@ print(f"Calibrated memory: {adjusted_memory:.1f} GB (was {mem.total_gb:.1f} GB)"
 Calibrator.save(cal.result, "~/.ftune/my_a100_calibration.json")
 
 # Load it later
-from ftune.core.models import CalibrationResult
+from ftuneai.core.models import CalibrationResult
 saved = Calibrator.load("~/.ftune/my_a100_calibration.json")
 ```
 
@@ -314,8 +314,8 @@ time = est.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, mfu_over
 Compare ftune estimates against actual training metrics from real runs:
 
 ```python
-from ftune import Estimator
-from ftune.validation import Validator, ActualMetrics
+from ftuneai import Estimator
+from ftuneai.validation import Validator, ActualMetrics
 
 est = Estimator(model="meta-llama/Llama-3.1-8B", method="qlora", quantization="4bit")
 
@@ -527,7 +527,7 @@ pip install ftuneai[all]       # Everything
 The most valuable contribution is **validation data**. Run ftune against your actual training runs and share the results:
 
 ```python
-from ftune import Estimator, Calibrator
+from ftuneai import Estimator, Calibrator
 
 est = Estimator(model="your-model", method="qlora", quantization="4bit", ...)
 cal = Calibrator.from_benchmark(

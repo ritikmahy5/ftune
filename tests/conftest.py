@@ -1,7 +1,7 @@
 """Shared test fixtures."""
 
 import pytest
-from ftune import Estimator
+from ftuneai import Estimator
 
 
 @pytest.fixture

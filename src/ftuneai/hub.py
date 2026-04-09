@@ -14,7 +14,7 @@ from typing import Optional
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
-from ftune.core.models import ModelSpec
+from ftuneai.core.models import ModelSpec
 
 
 # HuggingFace Hub API base URL
@@ -42,7 +42,7 @@ _PARAM_ALIASES = {
 def _get_version() -> str:
     """Get package version without circular import."""
     try:
-        from ftune import __version__
+        from ftuneai import __version__
         return __version__
     except ImportError:
         return "0.2.0"

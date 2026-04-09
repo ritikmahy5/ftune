@@ -10,8 +10,8 @@ Deploy to Streamlit Community Cloud:
 import sys
 from pathlib import Path
 
-# Add src to path so ftune is importable
+# Add src to path so ftuneai is importable
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Run the app (Streamlit executes this file top-to-bottom)
-exec(open(Path(__file__).parent / "src" / "ftune" / "app.py").read())
+exec(open(Path(__file__).parent / "src" / "ftuneai" / "app.py").read())  # noqa: S102

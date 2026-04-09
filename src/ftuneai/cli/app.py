@@ -10,7 +10,7 @@ from typing import Optional
 
 import typer
 
-from ftune import Estimator
+from ftuneai import Estimator
 
 app = typer.Typer(
     name="ftune",
@@ -38,7 +38,7 @@ def estimate(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: json, markdown"),
 ):
     """Estimate memory, training time, and costs for fine-tuning."""
-    from ftune.cli.display import (
+    from ftuneai.cli.display import (
         console, print_header, print_memory, print_gpu_fit, print_time, print_costs,
     )
 
@@ -145,9 +145,9 @@ def estimate(
 def models():
     """List all supported models."""
     from rich.table import Table
-    from ftune.cli.display import console
-    from ftune.loader import load_models
-    from ftune.utils.formatting import format_params
+    from ftuneai.cli.display import console
+    from ftuneai.loader import load_models
+    from ftuneai.utils.formatting import format_params
 
     all_models = load_models()
 
@@ -175,8 +175,8 @@ def models():
 def gpus():
     """List all supported GPUs."""
     from rich.table import Table
-    from ftune.cli.display import console
-    from ftune.loader import load_gpus
+    from ftuneai.cli.display import console
+    from ftuneai.loader import load_gpus
 
     all_gpus = load_gpus()
 
@@ -206,10 +206,10 @@ def pricing(
     stale: Optional[int] = typer.Option(None, "--stale", help="Show all providers, highlight those older than N days"),
 ):
     """Show cloud pricing for a specific GPU, or staleness info."""
-    from ftune.cli.display import console
+    from ftuneai.cli.display import console
 
     if stale is not None:
-        from ftune.core.cost import get_staleness
+        from ftuneai.core.cost import get_staleness
         from rich.table import Table
 
         staleness = get_staleness()
@@ -231,7 +231,7 @@ def pricing(
         console.print(table)
         return
 
-    from ftune.core.cost import CostEstimator, get_staleness
+    from ftuneai.core.cost import CostEstimator, get_staleness
 
     ce = CostEstimator()
     estimates = ce.estimate_for_gpu(gpu, training_hours=hours)
@@ -281,8 +281,8 @@ def pricing_update(
     spot_rate: Optional[float] = typer.Option(None, "--spot-rate", help="New spot hourly rate in USD"),
 ):
     """Update cloud GPU pricing for a provider."""
-    from ftune.cli.display import console
-    from ftune.core.cost import update_price
+    from ftuneai.cli.display import console
+    from ftuneai.core.cost import update_price
 
     try:
         old_rate, new_rate = update_price(provider, gpu, rate, spot_rate)
@@ -309,8 +309,8 @@ def validate(
     lora_rank: int = typer.Option(16, "--lora-rank", "-r"),
 ):
     """Validate estimates against actual training metrics."""
-    from ftune.cli.display import console
-    from ftune.validation import Validator
+    from ftuneai.cli.display import console
+    from ftuneai.validation import Validator
 
     if method == "full":
         quantization = "none"
