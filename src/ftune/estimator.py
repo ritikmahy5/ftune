@@ -12,7 +12,6 @@ from ftune.core.cost import CostEstimator
 from ftune.core.memory import MemoryEstimator
 from ftune.core.models import (
     CostComparison,
-    CostEstimate,
     FineTuneMethod,
     GPUFit,
     LoRATarget,

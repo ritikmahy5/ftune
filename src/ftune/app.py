@@ -16,9 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import streamlit as st
 
-from ftune import Estimator, list_model_names, list_gpu_names
-from ftune.core.models import FineTuneMethod, Quantization, LoRATarget, OptimizerType
-from ftune.loader import load_gpus
+from ftune import Estimator, list_model_names
 
 
 # ─────────────────────────────────────────────

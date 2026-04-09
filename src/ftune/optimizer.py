@@ -9,8 +9,6 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-logger = logging.getLogger(__name__)
-
 from ftune.core.cost import CostEstimator
 from ftune.core.memory import MemoryEstimator
 from ftune.core.models import (
@@ -24,6 +22,8 @@ from ftune.core.models import (
 )
 from ftune.core.time import TimeEstimator
 from ftune.loader import get_gpu, get_model, load_gpus
+
+logger = logging.getLogger(__name__)
 
 
 # Search space for configuration optimizer

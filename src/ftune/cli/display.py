@@ -7,7 +7,6 @@ from typing import List
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 from ftune.core.models import CostComparison, GPUFit, MemoryBreakdown, TimeEstimate
 from ftune.utils.formatting import format_params, format_percentage

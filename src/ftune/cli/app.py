@@ -10,7 +10,7 @@ from typing import Optional
 
 import typer
 
-from ftune import Estimator, list_model_names, list_gpu_names
+from ftune import Estimator
 
 app = typer.Typer(
     name="ftune",
@@ -168,7 +168,7 @@ def models():
         )
 
     console.print(table)
-    console.print(f"\n  [dim]Plus any model on HuggingFace Hub via auto-detect[/dim]")
+    console.print("\n  [dim]Plus any model on HuggingFace Hub via auto-detect[/dim]")
 
 
 @app.command()
