@@ -1,7 +1,15 @@
 """Tests for cloud cost estimation engine."""
 
+import shutil
+from pathlib import Path
+
+import pytest
+
 from ftune import Estimator
-from ftune.core.cost import CostEstimator, list_providers, get_provider_display_name
+from ftune.core.cost import (
+    CostEstimator, list_providers, get_provider_display_name,
+    update_price, get_staleness,
+)
 
 
 class TestCostDataLoading:
@@ -138,3 +146,130 @@ class TestEstimatorCostIntegration:
         comparison = est.full_comparison(dataset_size=50000, epochs=3)
         costs = [e.total_cost for e in comparison.estimates]
         assert costs == sorted(costs)
+
+
+# ─────────────────────────────────────────────────────────
+# Pricing update tests
+# ─────────────────────────────────────────────────────────
+
+_PRICING_SRC = Path(__file__).parent.parent / "src" / "ftune" / "data" / "pricing.yaml"
+
+
+@pytest.fixture
+def tmp_pricing(tmp_path: Path) -> Path:
+    """Copy real pricing.yaml to a temp dir for safe mutation."""
+    dst = tmp_path / "pricing.yaml"
+    shutil.copy(_PRICING_SRC, dst)
+    return dst
+
+
+class TestUpdatePrice:
+    """Tests for the pricing update mechanism."""
+
+    def test_update_valid_price(self, tmp_pricing: Path):
+        """Should update rate and return old/new values."""
+        old, new = update_price("lambda_labs", "A100-80GB", 2.99, pricing_path=tmp_pricing)
+        assert old == 1.99
+        assert new == 2.99
+
+        # Verify written to disk
+        import yaml
+        with open(tmp_pricing) as f:
+            data = yaml.safe_load(f)
+        assert data["providers"]["lambda_labs"]["gpus"]["A100-80GB"]["hourly_rate"] == 2.99
+
+    def test_update_sets_provider_timestamp(self, tmp_pricing: Path):
+        """Should update provider's last_updated to today."""
+        from datetime import date
+        update_price("lambda_labs", "A100-80GB", 2.99, pricing_path=tmp_pricing)
+
+        import yaml
+        with open(tmp_pricing) as f:
+            data = yaml.safe_load(f)
+        assert data["providers"]["lambda_labs"]["last_updated"] == date.today().isoformat()
+
+    def test_update_sets_global_timestamp(self, tmp_pricing: Path):
+        """Global last_updated should be max of all provider dates."""
+        from datetime import date
+        update_price("lambda_labs", "A100-80GB", 2.99, pricing_path=tmp_pricing)
+
+        import yaml
+        with open(tmp_pricing) as f:
+            data = yaml.safe_load(f)
+        assert data["last_updated"] == date.today().isoformat()
+
+    def test_update_with_spot_rate(self, tmp_pricing: Path):
+        """Should update both on-demand and spot rates."""
+        update_price("runpod", "A100-80GB", 1.89, spot_hourly_rate=1.19, pricing_path=tmp_pricing)
+
+        import yaml
+        with open(tmp_pricing) as f:
+            data = yaml.safe_load(f)
+        gpu = data["providers"]["runpod"]["gpus"]["A100-80GB"]
+        assert gpu["hourly_rate"] == 1.89
+        assert gpu["spot_hourly_rate"] == 1.19
+
+    def test_update_invalid_provider(self, tmp_pricing: Path):
+        """Unknown provider should raise KeyError."""
+        with pytest.raises(KeyError, match="not found"):
+            update_price("fake_provider", "A100-80GB", 1.99, pricing_path=tmp_pricing)
+
+    def test_update_invalid_gpu(self, tmp_pricing: Path):
+        """Unknown GPU for valid provider should raise KeyError."""
+        with pytest.raises(KeyError, match="not found"):
+            update_price("lambda_labs", "FAKE-GPU-999GB", 1.99, pricing_path=tmp_pricing)
+
+    def test_update_negative_rate(self, tmp_pricing: Path):
+        """Negative rate should raise ValueError."""
+        with pytest.raises(ValueError, match="between"):
+            update_price("lambda_labs", "A100-80GB", -1.0, pricing_path=tmp_pricing)
+
+    def test_update_zero_rate(self, tmp_pricing: Path):
+        """Zero rate should raise ValueError."""
+        with pytest.raises(ValueError, match="between"):
+            update_price("lambda_labs", "A100-80GB", 0.0, pricing_path=tmp_pricing)
+
+    def test_update_extreme_rate(self, tmp_pricing: Path):
+        """Rate > $500 should raise ValueError."""
+        with pytest.raises(ValueError, match="between"):
+            update_price("lambda_labs", "A100-80GB", 999.0, pricing_path=tmp_pricing)
+
+    def test_spot_rate_above_ondemand(self, tmp_pricing: Path):
+        """Spot rate >= on-demand should raise ValueError."""
+        with pytest.raises(ValueError, match="less than"):
+            update_price("runpod", "A100-80GB", 1.50, spot_hourly_rate=2.00, pricing_path=tmp_pricing)
+
+
+class TestStaleness:
+    """Tests for pricing staleness reporting."""
+
+    def test_get_staleness_returns_all_providers(self):
+        """Should return info for all providers."""
+        staleness = get_staleness()
+        providers = list_providers()
+        assert len(staleness) == len(providers)
+
+    def test_staleness_has_required_fields(self):
+        """Each entry should have provider, display_name, last_updated, days_ago, gpu_count."""
+        staleness = get_staleness()
+        for s in staleness:
+            assert "provider" in s
+            assert "display_name" in s
+            assert "last_updated" in s
+            assert "days_ago" in s
+            assert "gpu_count" in s
+            assert s["days_ago"] >= 0
+            assert s["gpu_count"] > 0
+
+    def test_staleness_sorted_most_stale_first(self):
+        """Should be sorted by days_ago descending."""
+        staleness = get_staleness()
+        days = [s["days_ago"] for s in staleness]
+        assert days == sorted(days, reverse=True)
+
+    def test_staleness_after_update(self, tmp_pricing: Path):
+        """Updated provider should show 0 days ago."""
+        update_price("lambda_labs", "A100-80GB", 2.99, pricing_path=tmp_pricing)
+        staleness = get_staleness(pricing_path=tmp_pricing)
+        lambda_entry = next(s for s in staleness if s["provider"] == "lambda_labs")
+        assert lambda_entry["days_ago"] == 0

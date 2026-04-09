@@ -11,6 +11,7 @@ last_updated: "2025-02-10"
 providers:
   lambda_labs:
     display_name: Lambda Labs
+    last_updated: "2025-02-10"
     website: https://lambdalabs.com/service/gpu-cloud
     gpus:
       H100-80GB:
@@ -36,6 +37,7 @@ providers:
 
   runpod:
     display_name: RunPod
+    last_updated: "2025-02-10"
     website: https://www.runpod.io/pricing
     gpus:
       H100-80GB:
@@ -65,6 +67,7 @@ providers:
 
   vast_ai:
     display_name: Vast.ai
+    last_updated: "2025-02-10"
     website: https://vast.ai/pricing
     gpus:
       H100-80GB:
@@ -86,6 +89,7 @@ providers:
 
   together_ai:
     display_name: Together AI
+    last_updated: "2025-02-10"
     website: https://www.together.ai/pricing
     gpus:
       H100-80GB:
@@ -97,6 +101,7 @@ providers:
 
   modal:
     display_name: Modal
+    last_updated: "2025-02-10"
     website: https://modal.com/pricing
     gpus:
       H100-80GB:
@@ -117,6 +122,7 @@ providers:
 
   aws:
     display_name: AWS
+    last_updated: "2025-02-10"
     website: https://aws.amazon.com/ec2/pricing/on-demand/
     gpus:
       H100-80GB:
@@ -148,6 +154,7 @@ providers:
 
   gcp:
     display_name: Google Cloud
+    last_updated: "2025-02-10"
     website: https://cloud.google.com/gpu/pricing
     gpus:
       H100-80GB:
@@ -189,6 +196,7 @@ providers:
 
   azure:
     display_name: Microsoft Azure
+    last_updated: "2025-02-10"
     website: https://azure.microsoft.com/en-us/pricing/details/virtual-machines/linux/
     gpus:
       H100-80GB:

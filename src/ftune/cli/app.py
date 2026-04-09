@@ -203,10 +203,35 @@ def gpus():
 def pricing(
     gpu: str = typer.Option("A100-80GB", "--gpu", help="GPU to check pricing for"),
     hours: float = typer.Option(10.0, "--hours", "-h", help="Training hours to estimate"),
+    stale: Optional[int] = typer.Option(None, "--stale", help="Show all providers, highlight those older than N days"),
 ):
-    """Show cloud pricing for a specific GPU."""
+    """Show cloud pricing for a specific GPU, or staleness info."""
     from ftune.cli.display import console
-    from ftune.core.cost import CostEstimator
+
+    if stale is not None:
+        from ftune.core.cost import get_staleness
+        from rich.table import Table
+
+        staleness = get_staleness()
+        table = Table(title="Pricing Staleness Report", border_style="dim")
+        table.add_column("Provider", style="white")
+        table.add_column("Last Updated", justify="right")
+        table.add_column("Age (days)", justify="right")
+        table.add_column("GPUs", justify="right", style="dim")
+
+        for s in staleness:
+            age_style = "red bold" if s["days_ago"] > stale else "green"
+            table.add_row(
+                s["display_name"],
+                s["last_updated"],
+                f"[{age_style}]{s['days_ago']}d[/{age_style}]",
+                str(s["gpu_count"]),
+            )
+
+        console.print(table)
+        return
+
+    from ftune.core.cost import CostEstimator, get_staleness
 
     ce = CostEstimator()
     estimates = ce.estimate_for_gpu(gpu, training_hours=hours)
@@ -214,6 +239,9 @@ def pricing(
     if not estimates:
         console.print(f"[red]No pricing data found for GPU '{gpu}'[/red]")
         raise typer.Exit(1)
+
+    # Build provider->staleness lookup
+    staleness_lookup = {s["display_name"]: s for s in get_staleness()}
 
     from rich.table import Table
     table = Table(title=f"Pricing: {gpu} × {hours}h", border_style="dim")
@@ -223,8 +251,15 @@ def pricing(
     table.add_column("Spot $/hr", justify="right", style="cyan")
     table.add_column("Spot Total", justify="right", style="cyan")
     table.add_column("Instance", style="dim")
+    table.add_column("Updated", justify="right", style="dim")
 
     for e in estimates:
+        s = staleness_lookup.get(e.provider, {})
+        days = s.get("days_ago", 0)
+        age_str = f"{days}d ago" if days > 0 else "today"
+        if days > 180:
+            age_str = f"[red]{age_str}[/red]"
+
         table.add_row(
             e.provider,
             f"${e.hourly_rate:.2f}",
@@ -232,9 +267,35 @@ def pricing(
             f"${e.spot_hourly_rate:.2f}" if e.spot_hourly_rate else "—",
             f"${e.spot_total_cost:.2f}" if e.spot_total_cost else "—",
             e.instance_type or "—",
+            age_str,
         )
 
     console.print(table)
+
+
+@app.command(name="pricing-update")
+def pricing_update(
+    provider: str = typer.Argument(..., help="Provider key (e.g. lambda_labs, runpod)"),
+    gpu: str = typer.Argument(..., help="GPU name (e.g. A100-80GB)"),
+    rate: float = typer.Option(..., "--rate", help="New hourly rate in USD"),
+    spot_rate: Optional[float] = typer.Option(None, "--spot-rate", help="New spot hourly rate in USD"),
+):
+    """Update cloud GPU pricing for a provider."""
+    from ftune.cli.display import console
+    from ftune.core.cost import update_price
+
+    try:
+        old_rate, new_rate = update_price(provider, gpu, rate, spot_rate)
+    except (KeyError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]Updated[/green] {provider} {gpu}: "
+        f"[dim]${old_rate:.2f}[/dim] -> [bold]${new_rate:.2f}[/bold]/hr"
+    )
+    if spot_rate is not None:
+        console.print(f"  Spot rate: [bold]${spot_rate:.2f}[/bold]/hr")
 
 
 @app.command()
