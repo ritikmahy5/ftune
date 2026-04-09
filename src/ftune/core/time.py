@@ -10,6 +10,7 @@ from ftune.core.models import (
     FineTuneMethod,
     GPUSpec,
     ModelSpec,
+    ShardingStrategy,
     TimeEstimate,
     TrainingConfig,
 )
@@ -18,20 +19,58 @@ from ftune.core.models import (
 # Constants
 # ─────────────────────────────────────────────────────────
 
-# FLOPs per token for a forward + backward pass
-# Approximation: ~6 × num_params per token (2x forward, 4x backward)
+# FLOPs per token for a forward + backward pass.
+# Forward: ~2P FLOPs (2 matrix ops per parameter per token).
+# Backward: ~4P FLOPs (2x forward for gradient computation).
+# Total: ~6P FLOPs per token.
+# Source: "Scaling Laws for Neural Language Models" (Kaplan et al., 2020)
+# Also: Megatron-LM (Shoeybi et al., 2019) uses same 6P approximation.
 FLOPS_PER_TOKEN_FACTOR = 6
 
-# Model FLOPs Utilization — fraction of theoretical GPU TFLOPS achieved
-# Conservative defaults based on empirical fine-tuning benchmarks
+# Model FLOPs Utilization (MFU): fraction of peak GPU TFLOPS achieved.
+# Source: "PaLM" (Chowdhery et al., 2022) reports 46-57% MFU on TPUv4
+# for large-batch pretraining. Fine-tuning typically achieves lower MFU
+# due to smaller batch sizes and less optimized data pipelines.
+# Empirical range: 0.20 (unoptimized) to 0.55 (highly tuned, large batch).
+# Our defaults are conservative for single-node fine-tuning.
 DEFAULT_MFU = {
-    "full": 0.35,    # Full fine-tuning baseline MFU
+    "full": 0.35,    # Full fine-tuning baseline
     "lora": 0.35,    # LoRA achieves similar MFU to full
     "qlora": 0.30,   # QLoRA has quantization/dequantization overhead
 }
 
 # Mixed precision speedup factor (bf16/fp16 vs fp32)
-MIXED_PRECISION_SPEEDUP = 1.0  # Already accounted for in TFLOPS specs
+MIXED_PRECISION_SPEEDUP = 1.0  # Already accounted for in GPU TFLOPS specs
+
+# LoRA backward pass only computes gradients for adapter parameters,
+# but the forward pass still runs the full model.
+# Net effect: ~75% of full fine-tuning FLOPs.
+# Empirical estimate — no rigorous source. The LoRA paper (Hu et al., 2021)
+# does not provide a FLOPs ratio. 0.75 is a commonly cited approximation.
+# Valid range: 0.65-0.85 depending on adapter rank and target modules.
+LORA_FLOPS_EFFICIENCY = 0.75
+
+# Multi-GPU scaling efficiency per additional GPU, by sharding strategy.
+# More aggressive sharding = more communication = lower per-GPU efficiency.
+#
+# Sources:
+# - DDP ~0.95: PyTorch DDP benchmarks, MLPerf training results
+# - ZeRO-1 ~0.93: Rajbhandari et al. 2020 ("ZeRO") — optimizer partitioning
+#   adds negligible communication vs DDP
+# - ZeRO-2 ~0.90: ZeRO paper — gradient reduce-scatter adds ~10% overhead
+# - ZeRO-3/FSDP ~0.82: ZeRO paper + empirical benchmarks — all-gather on
+#   every forward pass adds 15-25% overhead; 0.82 is mid-range estimate
+#
+# Each entry is (per_gpu_factor, floor).
+# Effective scaling = factor^(num_gpus - 1), clamped to floor.
+MULTI_GPU_SCALING = {
+    ShardingStrategy.NONE: (0.95, 0.80),
+    ShardingStrategy.ZERO_1: (0.93, 0.75),
+    ShardingStrategy.ZERO_2: (0.90, 0.70),
+    ShardingStrategy.FSDP_SHARD_GRAD: (0.90, 0.70),
+    ShardingStrategy.ZERO_3: (0.82, 0.60),
+    ShardingStrategy.FSDP: (0.82, 0.60),
+}
 
 
 class TimeEstimator:
@@ -86,18 +125,25 @@ class TimeEstimator:
         For full fine-tuning: 6 × num_params
         For LoRA: forward uses full model, backward only updates adapters
             Effective FLOPs ≈ 2 × num_params (forward) + 4 × trainable_params (backward)
+
+        For MoE models, per-token FLOPs only involve active experts.
         """
         total_params = self.model.parameters
         method = self.config.method
 
+        # MoE: per-token FLOPs only involve active experts
+        if self.model.is_moe and self.model.num_experts and self.model.num_active_experts:
+            moe_ratio = self.model.num_active_experts / self.model.num_experts
+            effective_params = int(total_params * moe_ratio)
+        else:
+            effective_params = total_params
+
         if method == FineTuneMethod.FULL:
-            return FLOPS_PER_TOKEN_FACTOR * total_params
+            return FLOPS_PER_TOKEN_FACTOR * effective_params
 
         # LoRA/QLoRA: forward pass is full, backward is partial
         # But in practice, backward still touches most of the computation graph
-        # Empirically, LoRA is ~70-80% the FLOPs of full fine-tuning
-        lora_efficiency = 0.75
-        return FLOPS_PER_TOKEN_FACTOR * total_params * lora_efficiency
+        return FLOPS_PER_TOKEN_FACTOR * effective_params * LORA_FLOPS_EFFICIENCY
 
     def _get_gpu_tflops(self, gpu: GPUSpec) -> float:
         """Get effective TFLOPS for the GPU based on dtype.
@@ -167,10 +213,12 @@ class TimeEstimator:
 
         # Multi-GPU scaling efficiency (accounts for communication overhead)
         if num_gpus > 1:
-            # ~90% scaling efficiency per additional GPU (empirical)
-            scaling_efficiency = 0.9 ** (num_gpus - 1)
-            # But floor at 0.7 (diminishing returns plateau)
-            scaling_efficiency = max(scaling_efficiency, 0.7)
+            strategy = self.config.sharding
+            factor, floor = MULTI_GPU_SCALING.get(
+                strategy, (0.95, 0.80)
+            )
+            scaling_efficiency = factor ** (num_gpus - 1)
+            scaling_efficiency = max(scaling_efficiency, floor)
             effective_flops_per_sec *= scaling_efficiency
 
         # Time calculation

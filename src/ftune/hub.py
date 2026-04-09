@@ -8,6 +8,7 @@ bundled database.
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Optional
 from urllib.request import urlopen, Request
@@ -37,20 +38,23 @@ _PARAM_ALIASES = {
     ],
 }
 
-# Known model parameter counts (billions) when not easily computable
-# Used as fallback when config doesn't have explicit param count
-_KNOWN_PARAM_COUNTS = {
-    "llama": {4096: 8e9, 8192: 70e9, 16384: 405e9},      # hidden_size → approx params
-    "mistral": {4096: 7.2e9, 8192: 46.7e9},
-    "qwen": {3584: 7.6e9, 8192: 72.7e9},
-    "gemma": {3584: 9.2e9, 4608: 27.2e9, 2048: 2.6e9},
-    "phi": {3072: 3.8e9, 5120: 14e9},
-}
+
+def _get_version() -> str:
+    """Get package version without circular import."""
+    try:
+        from ftune import __version__
+        return __version__
+    except ImportError:
+        return "0.2.0"
 
 
 def _fetch_json(url: str, timeout: int = 10) -> dict:
     """Fetch JSON from a URL with timeout."""
-    req = Request(url, headers={"User-Agent": "ftune/0.1.0"})
+    headers = {"User-Agent": f"ftune/{_get_version()}"}
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = Request(url, headers=headers)
     try:
         with urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -145,6 +149,11 @@ def fetch_model_config(model_name: str) -> dict:
         ConnectionError: If the model can't be fetched.
         ValueError: If the model doesn't exist or config is missing.
     """
+    if not re.match(r'^[\w.-]+/[\w.-]+$', model_name):
+        raise ValueError(
+            f"Invalid model name '{model_name}'. Expected format: 'org/model-name'."
+        )
+
     url = f"{HF_API_BASE}/{model_name}/resolve/main/config.json"
     try:
         config = _fetch_json(url)
@@ -187,6 +196,11 @@ def resolve_model_from_hub(model_name: str) -> ModelSpec:
             f"Could not extract required architecture fields from '{model_name}' config. "
             f"Keys found: {list(config.keys())}"
         )
+
+    # After validation, these are guaranteed non-None
+    assert hidden_size is not None
+    assert num_layers is not None
+    assert num_attention_heads is not None
 
     # Estimate parameters
     parameters = _estimate_param_count(config)

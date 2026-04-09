@@ -1,3 +1,4 @@
+# Streamlit Cloud deployment dependencies (see pyproject.toml for core/optional deps)
 pyyaml>=6.0
 streamlit>=1.30.0
 pandas>=2.0

@@ -36,7 +36,7 @@ You want to fine-tune Llama 3.1 70B. You spin up an A100, start training, and...
 
 Or worse — you rent 8×H100s for $30/hr, only to realize you could've done it with QLoRA on a single $1.50/hr GPU.
 
-**ftune fixes this.** Get accurate VRAM estimates, training time projections, and cost comparisons across 8 cloud providers — all before you spend a single dollar.
+**ftune fixes this.** Get VRAM estimates, training time projections, and cost comparisons across 8 cloud providers — all before you spend a single dollar.
 
 ### What makes ftune different?
 
@@ -402,6 +402,34 @@ Time = Total FLOPs / (GPU TFLOPS × MFU × num_gpus × scaling_efficiency)
 ```
 
 MFU defaults to 0.30-0.35 (conservative). Use calibration mode for hardware-specific values.
+
+---
+
+## Limitations & Accuracy
+
+ftune provides **analytical estimates**, not profiling results. All numbers are derived from architecture-level formulas with empirical correction factors — no PyTorch, no GPU required, but also no runtime measurement.
+
+**Known assumptions and their impact:**
+
+| Assumption | Impact | Mitigation |
+|---|---|---|
+| MFU defaults (0.30-0.35) | Time estimates can be off by 2-3x depending on hardware, batch size, and framework optimizations | Use calibration mode with a real 10-step benchmark |
+| Activation memory formula | Simplified — doesn't model per-op memory peaks or memory allocator behavior | Conservative factors partially compensate |
+| Static cloud pricing | Prices change frequently; bundled data may be stale | Check provider websites for current rates |
+| LoRA on MoE models | Assumes standard (non-expert) LoRA targets | Expert-specific LoRA estimation not yet supported |
+
+**When to trust ftune estimates:**
+
+- Relative comparisons (QLoRA vs LoRA, GPU A vs GPU B) — high confidence
+- Will-it-fit checks (does this config OOM on 24GB?) — good confidence with ~20% margin
+- Absolute wall-clock time — use calibration mode; defaults can be off by 2-3x
+- Absolute cost — treat as order-of-magnitude; verify provider pricing
+
+**When NOT to trust ftune:**
+
+- Sequence lengths near the model's maximum (attention memory scaling is nonlinear)
+- Exotic architectures not in the model database (use HuggingFace Hub auto-detect and verify)
+- Multi-node training (ftune models single-node multi-GPU only)
 
 ---
 

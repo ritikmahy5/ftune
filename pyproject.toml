@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftune"
-version = "0.1.0"
+version = "0.2.0"
 description = "Estimate GPU memory, training time, and costs for LLM fine-tuning"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Your Name", email = "you@example.com" },
+    { name = "Ritik Pankaj Mahyavanshi", email = "mahyavanshiritik2311@gmail.com" },
 ]
 keywords = ["llm", "fine-tuning", "gpu", "memory", "cost-estimator", "lora", "qlora"]
 classifiers = [
@@ -19,7 +19,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -34,6 +33,8 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.4.0",
+    "mypy>=1.0",
+    "types-PyYAML>=6.0",
 ]
 cli = [
     "typer>=0.12.0",
@@ -73,5 +74,5 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100

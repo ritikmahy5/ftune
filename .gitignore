@@ -12,9 +12,10 @@ build/
 venv/
 env/
 
-# IDE
+# IDE / tools
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
@@ -23,6 +24,10 @@ env/
 .coverage
 htmlcov/
 
+# Generated
+docs/
+
 # OS
 .DS_Store
 Thumbs.db
+*.docx

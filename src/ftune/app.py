@@ -197,24 +197,44 @@ try:
         lora_alpha=lora_alpha,
         lora_target=lora_target,
     )
-    error = None
+    error: str | None = None
 except Exception as e:
-    est = None
+    est = None  # type: ignore[assignment]
     error = str(e)
 
-if error:
+if error or est is None:
     st.error(f"⚠️ Configuration Error: {error}")
     st.stop()
 
 
 # ─────────────────────────────────────────────
-# Compute Estimates
+# Compute Estimates (cached)
 # ─────────────────────────────────────────────
 
-mem = est.estimate_memory()
-fits = est.check_gpu_fit()
-times = est.estimate_time_all_gpus(dataset_size=dataset_size, epochs=epochs, num_gpus=num_gpus)
-full_costs = est.full_comparison(dataset_size=dataset_size, epochs=epochs, num_gpus=num_gpus)
+@st.cache_data(show_spinner=False)
+def compute_memory(_est_hash, est_ref):
+    return est_ref.estimate_memory()
+
+@st.cache_data(show_spinner=False)
+def compute_gpu_fit(_est_hash, est_ref):
+    return est_ref.check_gpu_fit()
+
+@st.cache_data(show_spinner=False)
+def compute_times(_est_hash, est_ref, ds, ep, ng):
+    return est_ref.estimate_time_all_gpus(dataset_size=ds, epochs=ep, num_gpus=ng)
+
+@st.cache_data(show_spinner=False)
+def compute_costs(_est_hash, est_ref, ds, ep, ng):
+    return est_ref.full_comparison(dataset_size=ds, epochs=ep, num_gpus=ng)
+
+_est_key = (model_name, method, quantization, batch_size, seq_length,
+            gradient_checkpointing, optimizer, lora_rank, lora_alpha,
+            lora_target, dataset_size, epochs, num_gpus)
+
+mem = compute_memory(_est_key, est)
+fits = compute_gpu_fit(_est_key, est)
+times = compute_times(_est_key, est, dataset_size, epochs, num_gpus)
+full_costs = compute_costs(_est_key, est, dataset_size, epochs, num_gpus)
 
 
 # ─────────────────────────────────────────────

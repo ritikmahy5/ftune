@@ -102,7 +102,7 @@ def get_model(name: str) -> ModelSpec:
         # Cache it for subsequent calls
         models[name] = spec
         return spec
-    except (ValueError, ConnectionError, Exception):
+    except (ValueError, ConnectionError, ImportError, KeyError):
         pass
 
     # Nothing worked

@@ -50,16 +50,32 @@ QUANTIZATION_OVERHEAD_FRACTION = {
     Quantization.INT4: 0.02,
 }
 
-# Activation factors
+# Activation memory factor: with gradient checkpointing, only 1 activation
+# per layer checkpoint is stored. Factor ~2 accounts for the recomputation
+# buffer during backward pass.
+# Without checkpointing, all intermediate activations are stored.
+# Source: "Training Deep Nets with Sublinear Memory Cost" (Chen et al., 2016)
+# Empirical range: 1.5-3.0 (with checkpointing), 8-12 (without)
 ACTIVATION_FACTOR_WITH_CHECKPOINTING = 2.0
 ACTIVATION_FACTOR_WITHOUT_CHECKPOINTING = 10.0
 
-# FlashAttention-2 reduces activation memory for attention computation
-# by ~40-60% compared to standard attention (no materialized attention matrix).
-# We model this as a multiplier on activation memory.
-FLASH_ATTENTION_ACTIVATION_REDUCTION = 0.5  # 50% reduction in activation memory
+# FlashAttention-2 avoids materializing the full N*N attention matrix,
+# replacing O(N^2) memory with O(N) per attention head.
+# Source: "FlashAttention-2: Faster Attention with Better Parallelism
+# and Work Partitioning" (Dao, 2023) — Section 3, memory analysis.
+# The 50% reduction applies to total activation memory because attention
+# is roughly half of per-layer activations for typical hidden sizes.
+# Empirical range: 0.4-0.6 depending on sequence length and hidden size.
+FLASH_ATTENTION_ACTIVATION_REDUCTION = 0.5
 
-# CUDA overhead
+# Communication buffer for ZeRO-3/FSDP all-gather during forward pass.
+# Source: DeepSpeed documentation recommends reserving 5% for comm buffers.
+ZERO3_COMM_BUFFER_FRACTION = 0.05
+
+# CUDA context, memory allocator fragmentation, and cuDNN workspace.
+# Empirical estimate: varies 10-20% depending on PyTorch version,
+# CUDA version, and allocator configuration (e.g. expandable_segments).
+# We use 15% as a conservative middle-ground.
 CUDA_OVERHEAD_FRACTION = 0.15
 
 BYTES_TO_GB = 1 / (1024**3)
@@ -145,29 +161,52 @@ class MemoryEstimator:
     def _base_model_bytes_per_param(self) -> float:
         quant = self.config.quantization
         if quant != Quantization.NONE:
-            return QUANTIZATION_BYTES[quant]
+            val = QUANTIZATION_BYTES[quant]
+            return val if val is not None else float(self._dtype_bytes)
         return float(self._dtype_bytes)
 
     # ─────────────────────────────────────────────────────
     # LoRA
     # ─────────────────────────────────────────────────────
 
-    def _count_lora_target_modules(self) -> int:
-        target = self.config.lora_target
-        if target == LoRATarget.ATTENTION:
-            return 2
-        elif target == LoRATarget.ATTENTION_ALL:
-            return 4
-        elif target == LoRATarget.ALL_LINEAR:
-            return 7
-        return 2
-
     def _compute_lora_params(self) -> int:
-        modules_per_layer = self._count_lora_target_modules()
+        """Compute total LoRA adapter parameters using actual projection dimensions.
+
+        Each LoRA adapter for a linear layer (in_dim -> out_dim) adds:
+            A: (in_dim, rank) + B: (rank, out_dim) = rank * (in_dim + out_dim)
+
+        For GQA models, K/V projections are smaller than Q/O because
+        num_kv_heads < num_attention_heads.
+        """
         rank = self.config.lora_rank
         hidden = self.model.hidden_size
-        params_per_module = 2 * hidden * rank
-        return params_per_module * modules_per_layer * self.model.num_layers
+        head_dim = hidden // self.model.num_attention_heads
+        kv_dim = self.model.num_kv_heads * head_dim
+        intermediate = self.model.intermediate_size
+
+        # Attention projections
+        q_params = rank * (hidden + hidden)           # hidden -> hidden
+        k_params = rank * (hidden + kv_dim)            # hidden -> kv_dim
+        v_params = rank * (hidden + kv_dim)            # hidden -> kv_dim
+        o_params = rank * (hidden + hidden)            # hidden -> hidden
+
+        # MLP projections (SwiGLU: gate, up, down)
+        gate_params = rank * (hidden + intermediate)   # hidden -> intermediate
+        up_params = rank * (hidden + intermediate)     # hidden -> intermediate
+        down_params = rank * (intermediate + hidden)   # intermediate -> hidden
+
+        target = self.config.lora_target
+        if target == LoRATarget.ATTENTION:
+            per_layer = q_params + v_params
+        elif target == LoRATarget.ATTENTION_ALL:
+            per_layer = q_params + k_params + v_params + o_params
+        elif target == LoRATarget.ALL_LINEAR:
+            per_layer = (q_params + k_params + v_params + o_params
+                         + gate_params + up_params + down_params)
+        else:
+            per_layer = q_params + v_params
+
+        return per_layer * self.model.num_layers
 
     # ─────────────────────────────────────────────────────
     # Memory components
@@ -217,6 +256,11 @@ class MemoryEstimator:
 
         base_activation = batch * seq * hidden * layers * dtype_bytes * factor
 
+        # MoE: only active experts contribute activations per token
+        if self.model.is_moe and self.model.num_experts and self.model.num_active_experts:
+            moe_ratio = self.model.num_active_experts / self.model.num_experts
+            base_activation *= moe_ratio
+
         # FlashAttention-2 reduces activation memory
         if self.config.flash_attention:
             base_activation *= FLASH_ATTENTION_ACTIVATION_REDUCTION
@@ -261,8 +305,7 @@ class MemoryEstimator:
         if self.config.sharding in (
             ShardingStrategy.ZERO_3, ShardingStrategy.FSDP
         ) and self.config.num_gpus > 1:
-            # ~5% of model size for all-gather buffers
-            comm_buffer = model_weights * 0.05
+            comm_buffer = model_weights * ZERO3_COMM_BUFFER_FRACTION
 
         subtotal = (
             model_weights_per_gpu + trainable_per_gpu + gradients_per_gpu

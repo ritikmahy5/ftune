@@ -226,9 +226,20 @@ class Calibrator:
         return "\n".join(lines)
 
     @staticmethod
+    def _validate_path(p: Path) -> Path:
+        """Validate and resolve a file path, rejecting traversal attempts."""
+        resolved = p.resolve()
+        if ".." in p.parts:
+            raise ValueError(
+                f"Path traversal detected in '{p}'. Use an absolute path or a simple filename."
+            )
+        return resolved
+
+    @staticmethod
     def save(result: CalibrationResult, path: str) -> None:
         """Save calibration result to JSON file."""
         p = Path(path).expanduser()
+        p = Calibrator._validate_path(p)
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, "w") as f:
             json.dump(asdict(result), f, indent=2)
@@ -237,6 +248,7 @@ class Calibrator:
     def load(path: str) -> CalibrationResult:
         """Load calibration result from JSON file."""
         p = Path(path).expanduser()
+        p = Calibrator._validate_path(p)
         with open(p, "r") as f:
             data = json.load(f)
         return CalibrationResult(**data)

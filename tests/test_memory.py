@@ -164,6 +164,150 @@ class TestLoRAMemory:
 
 
 # ─────────────────────────────────────────────────────────
+# GQA-aware LoRA parameter calculation
+# ─────────────────────────────────────────────────────────
+
+
+class TestGQALoRAParams:
+    """Tests for GQA-aware LoRA parameter calculation."""
+
+    def test_gqa_attention_fewer_params_than_mha(self):
+        """GQA model (kv_heads < attn_heads) should have fewer LoRA params
+        for attention targets than an equivalent MHA model."""
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import (
+            ModelSpec, TrainingConfig, FineTuneMethod,
+            LoRATarget, OptimizerType, ShardingStrategy,
+        )
+
+        base_kwargs = dict(
+            parameters=8_000_000_000, hidden_size=4096, num_layers=32,
+            num_attention_heads=32, intermediate_size=14336,
+            vocab_size=128256, max_seq_length=4096,
+        )
+        gqa_spec = ModelSpec(name="gqa-model", num_kv_heads=8, **base_kwargs)
+        mha_spec = ModelSpec(name="mha-model", num_kv_heads=32, **base_kwargs)
+
+        config = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ATTENTION_ALL,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        gqa_params = MemoryEstimator(gqa_spec, config)._compute_lora_params()
+        mha_params = MemoryEstimator(mha_spec, config)._compute_lora_params()
+
+        assert gqa_params < mha_params, (
+            f"GQA ({gqa_params:,}) should have fewer params than MHA ({mha_params:,})"
+        )
+
+    def test_llama8b_all_linear_regression(self):
+        """Llama 3.1 8B ALL_LINEAR rank=16 should produce exactly 41,943,040 LoRA params.
+
+        Hand calculation:
+          hidden=4096, heads=32, kv_heads=8, head_dim=128, kv_dim=1024, intermediate=14336
+          q: 16*(4096+4096) = 131072, k: 16*(4096+1024) = 81920,
+          v: 16*(4096+1024) = 81920, o: 16*(4096+4096) = 131072
+          gate: 16*(4096+14336) = 294912, up: 16*(4096+14336) = 294912,
+          down: 16*(14336+4096) = 294912
+          per_layer = 1310720, total = 1310720 * 32 = 41943040
+        """
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import (
+            TrainingConfig, FineTuneMethod,
+            LoRATarget, OptimizerType, ShardingStrategy,
+        )
+        from ftune.loader import get_model
+
+        spec = get_model("meta-llama/Llama-3.1-8B")
+        config = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ALL_LINEAR,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        params = MemoryEstimator(spec, config)._compute_lora_params()
+        assert params == 41_943_040, f"Expected 41,943,040, got {params:,}"
+
+    def test_llama8b_attention_regression(self):
+        """Llama 3.1 8B ATTENTION (q,v) rank=16 should produce exactly 6,815,744 params.
+
+        Hand calculation:
+          q: 16*(4096+4096) = 131072, v: 16*(4096+1024) = 81920
+          per_layer = 212992, total = 212992 * 32 = 6815744
+        """
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import (
+            TrainingConfig, FineTuneMethod,
+            LoRATarget, OptimizerType, ShardingStrategy,
+        )
+        from ftune.loader import get_model
+
+        spec = get_model("meta-llama/Llama-3.1-8B")
+        config = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ATTENTION,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        params = MemoryEstimator(spec, config)._compute_lora_params()
+        assert params == 6_815_744, f"Expected 6,815,744, got {params:,}"
+
+    def test_mha_model_unchanged(self):
+        """For MHA model (kv_heads == attn_heads), ATTENTION_ALL params should equal
+        4 * 2 * hidden * rank * layers (the old formula was correct for MHA)."""
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import (
+            TrainingConfig, FineTuneMethod,
+            LoRATarget, OptimizerType, ShardingStrategy,
+        )
+        from ftune.loader import get_model
+
+        spec = get_model("microsoft/phi-3-mini-4k-instruct")
+        assert spec.num_kv_heads == spec.num_attention_heads, "Phi-3 mini should be MHA"
+
+        config = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ATTENTION_ALL,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        params = MemoryEstimator(spec, config)._compute_lora_params()
+        expected = 4 * 16 * (spec.hidden_size + spec.hidden_size) * spec.num_layers
+        assert params == expected, f"Expected {expected:,}, got {params:,}"
+
+    def test_all_linear_more_than_attention_all(self):
+        """ALL_LINEAR should always have more params than ATTENTION_ALL due to MLP."""
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import (
+            TrainingConfig, FineTuneMethod,
+            LoRATarget, OptimizerType, ShardingStrategy,
+        )
+        from ftune.loader import get_model
+
+        spec = get_model("meta-llama/Llama-3.1-8B")
+
+        config_attn = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ATTENTION_ALL,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+        config_all = TrainingConfig(
+            method=FineTuneMethod.LORA, lora_rank=16,
+            lora_target=LoRATarget.ALL_LINEAR,
+            optimizer=OptimizerType.ADAMW, sharding=ShardingStrategy.NONE,
+        )
+
+        attn_params = MemoryEstimator(spec, config_attn)._compute_lora_params()
+        all_params = MemoryEstimator(spec, config_all)._compute_lora_params()
+
+        assert all_params > attn_params * 2, (
+            f"ALL_LINEAR ({all_params:,}) should be >2x ATTENTION_ALL ({attn_params:,}) "
+            f"due to large MLP dimensions"
+        )
+
+
+# ─────────────────────────────────────────────────────────
 # Memory estimation: Full Fine-Tuning
 # ─────────────────────────────────────────────────────────
 
@@ -432,3 +576,145 @@ class TestCrossModel:
         )
         fits = est.check_gpu_fit(gpu_names=["T4-16GB"])
         assert fits[0].fits is True
+
+
+# ─────────────────────────────────────────────────────────
+# ZeRO / FSDP Sharding tests
+# ─────────────────────────────────────────────────────────
+
+
+class TestSharding:
+    """Tests for ZeRO/FSDP sharding memory reduction."""
+
+    def test_zero3_reduces_memory(self):
+        """ZeRO-3 with multiple GPUs should reduce per-GPU memory."""
+        est_no_shard = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            num_gpus=4, sharding="none",
+        )
+        est_zero3 = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            num_gpus=4, sharding="zero_3",
+        )
+        mem_no = est_no_shard.estimate_memory()
+        mem_z3 = est_zero3.estimate_memory()
+        assert mem_z3.total_gb < mem_no.total_gb
+
+    def test_zero3_weights_sharded(self):
+        """ZeRO-3 should shard model weights across GPUs."""
+        est_no_shard = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            num_gpus=4, sharding="none",
+        )
+        est_zero3 = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            num_gpus=4, sharding="zero_3",
+        )
+        mem_no = est_no_shard.estimate_memory()
+        mem_z3 = est_zero3.estimate_memory()
+        # Model weights should be ~1/4 with ZeRO-3
+        ratio = mem_no.model_weights_gb / mem_z3.model_weights_gb
+        assert ratio > 3, f"Expected ~4x weight reduction, got {ratio:.1f}x"
+
+    def test_zero1_only_shards_optimizer(self):
+        """ZeRO-1 should only reduce optimizer memory, not weights."""
+        est_no_shard = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            num_gpus=4, sharding="none",
+        )
+        est_zero1 = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            num_gpus=4, sharding="zero_1",
+        )
+        mem_no = est_no_shard.estimate_memory()
+        mem_z1 = est_zero1.estimate_memory()
+        # Weights should be the same
+        assert mem_no.model_weights_gb == mem_z1.model_weights_gb
+        # Optimizer should be reduced
+        assert mem_z1.optimizer_states_gb < mem_no.optimizer_states_gb
+
+
+# ─────────────────────────────────────────────────────────
+# MoE (Mixture of Experts) memory tests
+# ─────────────────────────────────────────────────────────
+
+
+class TestMoEMemory:
+    """Tests for MoE-aware memory estimation."""
+
+    def test_moe_reduces_activations(self):
+        """MoE model should have reduced activation memory (only active experts)."""
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import TrainingConfig, FineTuneMethod, Quantization, LoRATarget, OptimizerType, ShardingStrategy
+        from ftune.loader import get_model
+
+        moe_spec = get_model("mistralai/Mixtral-8x7B-v0.1")
+        assert moe_spec.is_moe
+
+        config = TrainingConfig(
+            model="mistralai/Mixtral-8x7B-v0.1",
+            method=FineTuneMethod.QLORA,
+            quantization=Quantization.INT4,
+            batch_size=1,
+            seq_length=2048,
+            gradient_checkpointing=True,
+            optimizer=OptimizerType.ADAMW,
+            lora_rank=16,
+            lora_alpha=32,
+            lora_target=LoRATarget.ATTENTION,
+            flash_attention=False,
+            sharding=ShardingStrategy.NONE,
+            num_gpus=1,
+        )
+
+        mem_est = MemoryEstimator(moe_spec, config)
+        mem = mem_est.estimate()
+
+        # Create a fake non-MoE version with same params for comparison
+        from dataclasses import replace
+        non_moe_spec = replace(moe_spec, is_moe=False, num_experts=None, num_active_experts=None)
+        mem_est_non_moe = MemoryEstimator(non_moe_spec, config)
+        mem_non_moe = mem_est_non_moe.estimate()
+
+        # MoE activations should be lower (2/8 = 25% of non-MoE)
+        assert mem.activations_gb < mem_non_moe.activations_gb
+
+    def test_moe_weights_not_reduced(self):
+        """MoE model weights should NOT be reduced (all experts stored)."""
+        from ftune.core.memory import MemoryEstimator
+        from ftune.core.models import TrainingConfig, FineTuneMethod, Quantization, LoRATarget, OptimizerType, ShardingStrategy
+        from ftune.loader import get_model
+        from dataclasses import replace
+
+        moe_spec = get_model("mistralai/Mixtral-8x7B-v0.1")
+        config = TrainingConfig(
+            model="mistralai/Mixtral-8x7B-v0.1",
+            method=FineTuneMethod.QLORA,
+            quantization=Quantization.INT4,
+            batch_size=1,
+            seq_length=2048,
+            gradient_checkpointing=True,
+            optimizer=OptimizerType.ADAMW,
+            lora_rank=16,
+            lora_alpha=32,
+            lora_target=LoRATarget.ATTENTION,
+            flash_attention=False,
+            sharding=ShardingStrategy.NONE,
+            num_gpus=1,
+        )
+
+        mem_est = MemoryEstimator(moe_spec, config)
+        mem = mem_est.estimate()
+
+        non_moe_spec = replace(moe_spec, is_moe=False, num_experts=None, num_active_experts=None)
+        mem_est_non_moe = MemoryEstimator(non_moe_spec, config)
+        mem_non_moe = mem_est_non_moe.estimate()
+
+        # Model weights should be the same (all experts stored)
+        assert mem.model_weights_gb == mem_non_moe.model_weights_gb

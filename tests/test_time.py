@@ -144,3 +144,79 @@ class TestTimeEstimation:
         time = est.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3)
         # Should be hours, not days or minutes
         assert 0.5 < time.total_hours < 50, f"Expected 0.5-50 hrs, got {time.total_hours}"
+
+
+class TestShardingAwareTime:
+    """Tests for sharding strategy affecting multi-GPU time estimation."""
+
+    def test_zero3_slower_than_zero1(self):
+        """ZeRO-3 should be slower than ZeRO-1 for same GPU count
+        due to higher communication overhead."""
+        est_z1 = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            sharding="zero_1", num_gpus=4,
+        )
+        est_z3 = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            sharding="zero_3", num_gpus=4,
+        )
+        time_z1 = est_z1.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=4)
+        time_z3 = est_z3.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=4)
+        assert time_z3.total_hours > time_z1.total_hours, (
+            f"ZeRO-3 ({time_z3.total_hours:.2f}h) should be slower than "
+            f"ZeRO-1 ({time_z1.total_hours:.2f}h) due to all-gather overhead"
+        )
+
+    def test_fsdp_slower_than_ddp(self):
+        """FSDP (full sharding) should be slower than DDP (no sharding) for same GPU count."""
+        est_ddp = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            sharding="none", num_gpus=4,
+        )
+        est_fsdp = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            sharding="fsdp", num_gpus=4,
+        )
+        time_ddp = est_ddp.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=4)
+        time_fsdp = est_fsdp.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=4)
+        assert time_fsdp.total_hours > time_ddp.total_hours, (
+            f"FSDP ({time_fsdp.total_hours:.2f}h) should be slower than "
+            f"DDP ({time_ddp.total_hours:.2f}h)"
+        )
+
+    def test_single_gpu_sharding_irrelevant(self):
+        """With 1 GPU, sharding strategy should not affect time estimate."""
+        est_none = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="qlora",
+            quantization="4bit", batch_size=4, seq_length=2048,
+            sharding="none", num_gpus=1,
+        )
+        est_z3 = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="qlora",
+            quantization="4bit", batch_size=4, seq_length=2048,
+            sharding="zero_3", num_gpus=1,
+        )
+        time_none = est_none.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=1)
+        time_z3 = est_z3.estimate_time(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=1)
+        assert time_none.total_hours == time_z3.total_hours
+
+    def test_zero2_between_zero1_and_zero3(self):
+        """ZeRO-2 overhead should be between ZeRO-1 and ZeRO-3."""
+        base_kwargs = dict(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048, num_gpus=4,
+        )
+        time_kwargs = dict(gpu="A100-80GB", dataset_size=50000, epochs=3, num_gpus=4)
+
+        time_z1 = Estimator(**base_kwargs, sharding="zero_1").estimate_time(**time_kwargs)
+        time_z2 = Estimator(**base_kwargs, sharding="zero_2").estimate_time(**time_kwargs)
+        time_z3 = Estimator(**base_kwargs, sharding="zero_3").estimate_time(**time_kwargs)
+
+        assert time_z1.total_hours < time_z2.total_hours < time_z3.total_hours, (
+            f"Expected z1 ({time_z1.total_hours:.2f}) < z2 ({time_z2.total_hours:.2f}) "
+            f"< z3 ({time_z3.total_hours:.2f})"
+        )

@@ -6,7 +6,10 @@ answers "given $X budget and GPU Y, what's the optimal config?"
 
 from __future__ import annotations
 
+import logging
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from ftune.core.cost import CostEstimator
 from ftune.core.memory import MemoryEstimator
@@ -126,7 +129,8 @@ class BudgetOptimizer:
                                         mem_est = MemoryEstimator(model_spec, config)
                                         try:
                                             mem = mem_est.estimate()
-                                        except Exception:
+                                        except Exception as e:
+                                            logger.debug("Skipping config (memory estimation failed): %s", e)
                                             continue
 
                                         # Check against each GPU
@@ -143,7 +147,8 @@ class BudgetOptimizer:
                                                     epochs=epochs,
                                                     num_gpus=num_gpus,
                                                 )
-                                            except Exception:
+                                            except Exception as e:
+                                                logger.debug("Skipping config (time estimation failed): %s", e)
                                                 continue
 
                                             # Estimate cost

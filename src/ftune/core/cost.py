@@ -7,7 +7,7 @@ bundled pricing database.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -61,6 +61,26 @@ class CostEstimator:
 
     def __init__(self) -> None:
         self.pricing = _load_pricing()
+
+    @staticmethod
+    def _find_best_value(
+        estimates: List[CostEstimate],
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Find cheapest and best-value providers from a list of estimates.
+
+        Returns:
+            Tuple of (cheapest_provider, best_value_provider).
+        """
+        if not estimates:
+            return None, None
+        cheapest = estimates[0].provider
+        best_value = cheapest
+        spot_estimates = [e for e in estimates if e.spot_total_cost is not None]
+        if spot_estimates:
+            best_spot = min(spot_estimates, key=lambda e: e.spot_total_cost or float('inf'))
+            if best_spot.spot_total_cost is not None and best_spot.spot_total_cost < estimates[0].total_cost:
+                best_value = f"{best_spot.provider} (spot)"
+        return cheapest, best_value
 
     def estimate_for_gpu(
         self,
@@ -153,16 +173,7 @@ class CostEstimator:
         all_estimates.sort(key=lambda e: e.total_cost)
 
         # Find cheapest and best value
-        cheapest = all_estimates[0].provider if all_estimates else None
-
-        # Best value considers spot pricing too
-        best_value = cheapest
-        if all_estimates:
-            spot_estimates = [e for e in all_estimates if e.spot_total_cost is not None]
-            if spot_estimates:
-                best_spot = min(spot_estimates, key=lambda e: e.spot_total_cost)
-                if best_spot.spot_total_cost < all_estimates[0].total_cost:
-                    best_value = f"{best_spot.provider} (spot)"
+        cheapest, best_value = self._find_best_value(all_estimates)
 
         # Use the min training hours for the comparison summary
         min_hours = min(training_hours_per_gpu.values()) if training_hours_per_gpu else 0
@@ -190,14 +201,7 @@ class CostEstimator:
         """
         estimates = self.estimate_for_gpu(gpu_name, training_hours)
 
-        cheapest = estimates[0].provider if estimates else None
-        best_value = cheapest
-        if estimates:
-            spot_options = [e for e in estimates if e.spot_total_cost is not None]
-            if spot_options:
-                best_spot = min(spot_options, key=lambda e: e.spot_total_cost)
-                if best_spot.spot_total_cost < estimates[0].total_cost:
-                    best_value = f"{best_spot.provider} (spot)"
+        cheapest, best_value = self._find_best_value(estimates)
 
         return CostComparison(
             estimates=estimates,
