@@ -1,6 +1,5 @@
 """Tests for the Budget Optimizer module."""
 
-import pytest
 from ftuneai.optimizer import BudgetOptimizer
 
 

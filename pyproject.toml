@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ftuneai"
-version = "0.4.0"
+version = "0.4.1"
 description = "Estimate GPU memory, training time, and costs for LLM fine-tuning"
 readme = "README.md"
 license = "MIT"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["llm", "fine-tuning", "gpu", "memory", "cost-estimator", "lora", "qlora"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -23,6 +23,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pyyaml>=6.0",

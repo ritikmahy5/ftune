@@ -299,6 +299,54 @@ def pricing_update(
 
 
 @app.command()
+def compare(
+    model: str = typer.Option(..., "--model", "-m", help="Model name (e.g. 'meta-llama/Llama-3.1-8B')"),
+    batch_size: int = typer.Option(4, "--batch-size", "-b", help="Per-device batch size"),
+    seq_length: int = typer.Option(2048, "--seq-length", "-s", help="Max sequence length"),
+    lora_rank: int = typer.Option(16, "--lora-rank", "-r", help="LoRA rank"),
+    gradient_checkpointing: bool = typer.Option(True, "--grad-ckpt/--no-grad-ckpt"),
+):
+    """Compare Full FT vs LoRA vs QLoRA side-by-side for a model."""
+    from rich.table import Table
+    from ftuneai.cli.display import console
+
+    methods = [
+        ("Full FT", "full", "none"),
+        ("LoRA", "lora", "none"),
+        ("QLoRA 4-bit", "qlora", "4bit"),
+        ("QLoRA 8-bit", "qlora", "8bit"),
+    ]
+
+    table = Table(title=f"Method Comparison: {model}", border_style="dim")
+    table.add_column("Method", style="cyan")
+    table.add_column("Total VRAM", justify="right", style="bold")
+    table.add_column("Weights", justify="right", style="dim")
+    table.add_column("Activations", justify="right", style="dim")
+    table.add_column("Trainable %", justify="right", style="yellow")
+
+    for label, method, quant in methods:
+        try:
+            est = Estimator(
+                model=model, method=method, quantization=quant,
+                batch_size=batch_size, seq_length=seq_length,
+                lora_rank=lora_rank,
+                gradient_checkpointing=gradient_checkpointing,
+            )
+            mem = est.estimate_memory()
+            table.add_row(
+                label,
+                f"{mem.total_gb:.1f} GB",
+                f"{mem.model_weights_gb:.1f} GB",
+                f"{mem.activations_gb:.1f} GB",
+                f"{mem.trainable_percentage:.2f}%",
+            )
+        except Exception as e:
+            table.add_row(label, f"[red]Error: {e}[/red]", "", "", "")
+
+    console.print(table)
+
+
+@app.command()
 def validate(
     model: str = typer.Option(..., "--model", "-m", help="Model name"),
     method: str = typer.Option("qlora", "--method", help="Fine-tuning method"),

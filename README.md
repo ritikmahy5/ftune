@@ -86,6 +86,38 @@ for c in costs.estimates[:5]:
     print(f"{c.provider:15s} | {c.gpu:15s} | ${c.total_cost:.2f}")
 ```
 
+### Example Output
+
+```text
+Model: meta-llama/Llama-3.1-8B (8.03B params)
+Method: QLORA (rank=16), 4bit | Batch: 4, Seq: 2048
+
+Memory Breakdown:
+  Model weights:        3.81 GB
+  LoRA adapters:        0.01 GB
+  Gradients:            0.01 GB
+  Optimizer states:     0.05 GB
+  Activations:         16.00 GB
+  CUDA overhead:        3.98 GB
+  TOTAL:               23.87 GB
+
+Trainable params: 6.82M (0.085%)
+```
+
+### Quick Method Comparison
+
+```bash
+ftune compare --model meta-llama/Llama-3.1-8B
+```
+
+```
+Method         VRAM      Weights   Trainable%
+──────────────────────────────────────────────
+Full FT       117.3 GB    15.0 GB     100.00%
+LoRA           27.6 GB    15.0 GB       0.08%
+QLoRA 4-bit    23.9 GB     3.8 GB       0.08%
+```
+
 ### Works with ANY HuggingFace model
 
 ftune auto-fetches model architecture from HuggingFace Hub — no configuration needed:

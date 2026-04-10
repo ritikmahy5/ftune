@@ -768,3 +768,87 @@ class TestMoEMemory:
 
         # Attention is shared — same params regardless of MoE
         assert moe_params == non_moe_params
+
+
+# ─────────────────────────────────────────────────────────
+# Edge cases
+# ─────────────────────────────────────────────────────────
+
+
+class TestEdgeCases:
+    """Edge case tests for estimation robustness."""
+
+    def test_small_model_fits_on_t4(self):
+        """StableLM 1.6B QLoRA should fit on T4 16GB easily."""
+        est = Estimator(
+            model="stabilityai/stablelm-2-1_6b", method="qlora",
+            quantization="4bit", batch_size=1, seq_length=512,
+        )
+        mem = est.estimate_memory()
+        assert mem.total_gb < 16, f"1.6B QLoRA should fit on T4, got {mem.total_gb:.1f}GB"
+
+    def test_405b_model_needs_massive_vram(self):
+        """Llama 405B full fine-tuning should need >500GB VRAM."""
+        est = Estimator(
+            model="meta-llama/Llama-3.1-405B", method="full",
+            batch_size=1, seq_length=512,
+        )
+        mem = est.estimate_memory()
+        assert mem.total_gb > 500, f"405B full FT should need >500GB, got {mem.total_gb:.1f}GB"
+
+    def test_405b_qlora_fits_reasonable(self):
+        """Llama 405B QLoRA 4-bit should be large but not absurd."""
+        est = Estimator(
+            model="meta-llama/Llama-3.1-405B", method="qlora",
+            quantization="4bit", batch_size=1, seq_length=512,
+        )
+        mem = est.estimate_memory()
+        assert 100 < mem.total_gb < 500, f"405B QLoRA should be 100-500GB, got {mem.total_gb:.1f}GB"
+
+    def test_batch_size_1_minimal(self):
+        """Batch size 1 with short seq should produce minimal activations."""
+        est = Estimator(
+            model="stabilityai/stablelm-2-1_6b", method="qlora",
+            quantization="4bit", batch_size=1, seq_length=256,
+        )
+        mem = est.estimate_memory()
+        assert mem.activations_gb < 1.0, f"Tiny config activations should be <1GB, got {mem.activations_gb:.2f}GB"
+
+
+# ─────────────────────────────────────────────────────────
+# Benchmark validation tests
+# ─────────────────────────────────────────────────────────
+
+
+class TestBenchmarkValidation:
+    """Tests that estimates match real GPU benchmark data within expected margins."""
+
+    def test_llama8b_qlora_a100_memory(self):
+        """Llama 8B QLoRA 4-bit on A100 should estimate ~24GB (actual: 24.2GB)."""
+        est = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="qlora",
+            quantization="4bit", lora_rank=16, batch_size=4,
+            seq_length=2048, gradient_checkpointing=True,
+        )
+        mem = est.estimate_memory()
+        assert 20 < mem.total_gb < 28, f"Expected ~24GB, got {mem.total_gb:.1f}GB"
+
+    def test_llama8b_lora_a100_memory(self):
+        """Llama 8B LoRA on A100 should estimate ~28GB (actual: 28.9GB)."""
+        est = Estimator(
+            model="meta-llama/Llama-3.1-8B", method="lora",
+            lora_rank=16, batch_size=4, seq_length=2048,
+            gradient_checkpointing=True,
+        )
+        mem = est.estimate_memory()
+        assert 24 < mem.total_gb < 34, f"Expected ~28GB, got {mem.total_gb:.1f}GB"
+
+    def test_mistral7b_qlora_v100_memory(self):
+        """Mistral 7B QLoRA on V100 should estimate ~5GB (actual: 5.1GB)."""
+        est = Estimator(
+            model="mistralai/Mistral-7B-v0.3", method="qlora",
+            quantization="4bit", lora_rank=16, batch_size=1,
+            seq_length=512, gradient_checkpointing=True,
+        )
+        mem = est.estimate_memory()
+        assert 3 < mem.total_gb < 8, f"Expected ~5GB, got {mem.total_gb:.1f}GB"
